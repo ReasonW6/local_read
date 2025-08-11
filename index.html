@@ -3,22 +3,96 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>本地电子书阅读器</title>
+  <title>本地电子书阅读器 (手动保存最终版)</title>
   <style>
-    /* 你的 CSS 样式保持不变，这里省略以节省空间 */
-    :root{ --bg: #FAF7ED; --page-bg: #EBEBEB; --text: #3D3D3D; --accent: #DB2828; --muted: #888888; --border-color: #E0E0E0; --hover-bg: #F0F0F0; --shadow-color: rgba(0,0,0,0.08); --toolbar-bg: #FFFFFF; }
-    [data-theme="dark"]{ --bg: #121212; --page-bg: #0A0A0A; --text: #BDBDBD; --accent: #D4AF37; --muted: #757575; --border-color: #2C2C2C; --hover-bg: #252525; --shadow-color: rgba(0,0,0,0.4); --toolbar-bg: #1E1E1E; }
-    *{ box-sizing: border-box; }
-    body, .sidebar, .reader, .right-toolbar, .book-item, .chapter-item, button { transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; }
-    body{ margin:0; background: var(--page-bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans GB", "Microsoft YaHei", sans-serif; overflow: hidden; }
-    .container{ display:flex; height: 100vh; padding-top: 30px; }
-    .sidebar{ width: 320px; flex-shrink: 0; background: var(--bg); border-right: 1px solid var(--border-color); overflow: hidden; transition: margin-left 0.3s ease-in-out; margin-left: -320px; display: flex; flex-direction: column; }
-    .sidebar.visible { margin-left: 0; }
-    .main{ flex:1; display:flex; justify-content: center; padding: 0 30px; overflow: auto; }
-    .reader{ max-width: 800px; width:100%; background: var(--bg); padding: 30px 40px; border-radius: 4px; box-shadow:0 2px 10px var(--shadow-color); height: fit-content; min-height: 95%; font-size: 18px; }
-    #book-meta { padding-bottom: 20px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; color: var(--muted); font-size: 14px; }
-    .bookshelf-view, .toc-view { display: none; flex-direction: column; height: 100%; }
-    .sidebar.show-bookshelf .bookshelf-view, .sidebar.show-toc .toc-view { display: flex; }
+    :root{ 
+      --bg: #FAF7ED;
+      --page-bg: #EBEBEB;
+      --text: #3D3D3D;
+      --accent: #DB2828;
+      --muted: #888888;
+      --border-color: #E0E0E0;
+      --hover-bg: #F0F0F0;
+      --shadow-color: rgba(0,0,0,0.08);
+      --toolbar-bg: #FFFFFF;
+    }
+    [data-theme="dark"]{ 
+      --bg: #121212;
+      --page-bg: #0A0A0A;
+      --text: #BDBDBD;
+      --accent: #D4AF37;
+      --muted: #757575;
+      --border-color: #2C2C2C;
+      --hover-bg: #252525;
+      --shadow-color: rgba(0,0,0,0.4);
+      --toolbar-bg: #1E1E1E;
+    }
+    *{
+      box-sizing: border-box;
+    }
+    body, .sidebar, .reader, .right-toolbar, .book-item, .chapter-item, button {
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    body{
+      margin:0;
+      background: var(--page-bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      overflow: hidden;
+    }
+    .container{
+      display:flex;
+      height: 100vh;
+      padding-top: 30px;
+    }
+    .sidebar{
+      width: 320px;
+      flex-shrink: 0;
+      background: var(--bg);
+      border-right: 1px solid var(--border-color);
+      overflow: hidden;
+      transition: margin-left 0.3s ease-in-out;
+      margin-left: -320px;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar.visible {
+      margin-left: 0;
+    }
+    .main{
+      flex:1;
+      display:flex;
+      justify-content: center;
+      padding: 0 30px;
+      overflow: auto;
+    }
+    .reader{
+      max-width: 800px;
+      width:100%;
+      background: var(--bg);
+      padding: 30px 40px;
+      border-radius: 4px;
+      box-shadow:0 2px 10px var(--shadow-color);
+      height: fit-content;
+      min-height: 95%;
+      font-size: 18px; 
+    }
+    #book-meta {
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 20px;
+        color: var(--muted);
+        font-size: 14px;
+    }
+    .bookshelf-view, .toc-view {
+        display: none;
+        flex-direction: column;
+        height: 100%;
+    }
+    .sidebar.show-bookshelf .bookshelf-view,
+    .sidebar.show-toc .toc-view {
+        display: flex;
+    }
     .bookshelf{padding:12px; flex-grow: 1; overflow-y: auto;}
     .book-item{display:flex;align-items:center;gap:8px;padding:8px;border-radius:6px;cursor:pointer}
     .book-item:hover{background: var(--hover-bg)}
@@ -44,6 +118,7 @@
     #chapter-nav button:hover { background: var(--hover-bg); color: var(--text); border-color: var(--text); }
     #chapter-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
     #refreshBookshelfBtn { margin: 12px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--hover-bg); cursor: pointer; text-align: center; flex-shrink: 0; }
+    #save-indicator { position: fixed; bottom: 20px; right: 100px; background-color: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 5px; opacity: 0; transition: opacity 0.5s ease; z-index: 2000; pointer-events: none; }
     @media(max-width:900px){ .container { padding-top: 15px; } .sidebar{ position: fixed; left: 0; top: 0; height: 100%; z-index: 1100; margin-left: -320px; } .sidebar.visible { margin-left: 0; } .main { padding: 0 15px; } .reader{ min-height: 98%; } .right-toolbar { right: 10px; } }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -72,6 +147,12 @@
     <button id="themeToggle" title="切换日/夜间模式">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
       <span>夜间</span>
+    </button>
+    <!-- 新增：手动保存按钮 -->
+    <div class="toolbar-divider"></div>
+    <button id="saveProgressBtn" title="手动保存进度">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+      <span>保存</span>
     </button>
   </div>
 
@@ -102,6 +183,7 @@
           <p class="muted">请先将 .epub 或 .txt 文件放入项目根目录的 'books' 文件夹中，然后点击右侧的 "书架" 按钮。</p>
         </div>
         <div id="chapter-nav"></div>
+        <div id="save-indicator">已保存</div>
       </div>
     </main>
   </div>
@@ -111,7 +193,8 @@
 let state = {
   type: null, book: null, rendition: null, chapters: [], currentIndex: 0,
   fontSize: 18, theme: 'light', txtPages: [], currentFileKey: null, bookshelf: [],
-  sidebarView: 'toc'
+  sidebarView: 'toc',
+  isNavigating: false
 };
 
 // ---------- DOM Elements ----------
@@ -128,6 +211,7 @@ const chapterNav = document.getElementById('chapter-nav');
 const refreshBookshelfBtn = document.getElementById('refreshBookshelfBtn');
 const fontIncreaseBtn = document.getElementById('fontIncreaseBtn');
 const fontDecreaseBtn = document.getElementById('fontDecreaseBtn');
+const saveProgressBtn = document.getElementById('saveProgressBtn'); // 新增
 
 // ---------- Event Listeners ----------
 document.addEventListener('DOMContentLoaded', loadBookshelf);
@@ -136,7 +220,9 @@ refreshBookshelfBtn.addEventListener('click', loadBookshelf);
 tocToggleBtn.addEventListener('click', () => toggleSidebar('toc'));
 fontIncreaseBtn.addEventListener('click', () => changeFontSize(1));
 fontDecreaseBtn.addEventListener('click', () => changeFontSize(-1));
+saveProgressBtn.addEventListener('click', manualSaveProgress); // 新增
 
+// ---------- Helper Functions ----------
 async function loadBookshelf() {
   try {
     const response = await fetch('/api/bookshelf');
@@ -170,48 +256,37 @@ async function openBookFromServer(book) {
     try {
         const response = await fetch(`/api/book?path=${encodeURIComponent(book.path)}`);
         if (!response.ok) throw new Error(`Book not found or failed to load: ${book.name}`);
-
         const fileData = await response.arrayBuffer();
-        const file = new File([fileData], book.name);
-
-        // --- 从这里开始，逻辑和原来打开文件的逻辑几乎一样 ---
-        state.currentFileKey = getFileKey(book.path); // 使用 book.path 作为唯一键
+        state.currentFileKey = getFileKey(book.path);
         bookMeta.textContent = `书名: ${book.name}`;
         const name = book.name.toLowerCase();
-        
         if (name.endsWith('.epub')) {
             state.type = 'epub';
             await openEpub(fileData);
         } else if (name.endsWith('.txt')) {
             state.type = 'txt';
-            // 对于TXT，我们需要先解码
             const text = await readArrayBufferWithEncoding(fileData);
             await openTxt(text, book.name);
         }
-
     } catch (error) {
         console.error('Error opening book from server:', error);
         alert(`打开书籍 "${book.name}" 失败: ${error.message}`);
     }
 }
 
-// 辅助函数，用于将 ArrayBuffer 解码为文本，会尝试 UTF-8 和 GBK
 async function readArrayBufferWithEncoding(arrayBuffer) {
     const decoderUtf8 = new TextDecoder('utf-8', { fatal: true });
-    try {
-        return decoderUtf8.decode(arrayBuffer);
-    } catch (e) {
+    try { return decoderUtf8.decode(arrayBuffer); }
+    catch (e) {
         console.log("UTF-8 decoding failed, trying GBK...");
         const decoderGbk = new TextDecoder('gbk');
         return decoderGbk.decode(arrayBuffer);
     }
 }
 
-
 function toggleSidebar(view) {
     const isCurrentlyVisible = sidebar.classList.contains('visible');
     const isSameView = state.sidebarView === view;
-
     if (isCurrentlyVisible && isSameView) {
         sidebar.classList.remove('visible');
     } else {
@@ -226,22 +301,8 @@ themeToggle.addEventListener('click', async () => {
   document.body.dataset.theme = state.theme;
   const themeLabel = themeToggle.querySelector('span');
   themeLabel.textContent = state.theme === 'light' ? '夜间' : '日间';
-
   if (state.rendition && state.type === 'epub') {
-    try {
-      const currentLocation = state.rendition.currentLocation();
-      const currentCfi = currentLocation ? currentLocation.start.cfi : null;
-      state.rendition.themes.select(state.theme);
-      if (currentCfi) {
-        await state.rendition.display(currentCfi);
-      } else if (state.chapters[state.currentIndex]) {
-        await state.rendition.display(state.chapters[state.currentIndex].href);
-      }
-      state.rendition.themes.fontSize(state.fontSize + 'px');
-    } catch (error) {
-      console.warn('Theme switching error:', error);
-      state.rendition.themes.select(state.theme);
-    }
+    state.rendition.themes.select(state.theme);
   }
 });
 
@@ -266,7 +327,11 @@ function registerEpubThemes() {
     state.rendition.themes.register("dark", { "body": { ...commonStyles, "color": "#BDBDBD !important", "background-color": "#121212 !important" }, "p": { "color": "#BDBDBD !important" }, "h1, h2, h3, h4, h5, h6": { "color": "#BDBDBD !important" }, "div": { "color": "#BDBDBD !important" } });
 }
 
-// ---------- File Handling & Reading ----------
+// ---------- Core Reading Logic ----------
+
+/**
+ * 最终修复版 EPUB 打开函数
+ */
 async function openEpub(arrayBuffer) {
   clearReader();
   try {
@@ -274,38 +339,61 @@ async function openEpub(arrayBuffer) {
     readerInner.innerHTML = '<div id="epub-container" class="epub-container"></div>';
     if (state.rendition) state.rendition.destroy();
     state.rendition = state.book.renderTo('epub-container', { flow: 'scrolled-doc', width: '100%' });
-    
+
     registerEpubThemes();
     state.rendition.themes.select(state.theme);
     applyFontSize();
 
     await state.book.ready;
+
+    // 1. 以书脊(Spine)为准，建立与 ePub.js 内部索引完全同步的章节列表
     const nav = await state.book.loaded.navigation;
-    state.chapters = [];
-    function walk(items) {
-      items.forEach(i => {
-        state.chapters.push({ label: i.label.trim(), href: i.href });
-        if (i.subitems && i.subitems.length) walk(i.subitems);
-      });
+    const spine = state.book.spine;
+    const tocItems = new Map();
+    function flattenToc(items) {
+        items.forEach(item => {
+            const key = item.href.split('#')[0];
+            tocItems.set(key, item.label.trim());
+            if (item.subitems && item.subitems.length) {
+                flattenToc(item.subitems);
+            }
+        });
     }
-    walk(nav.toc || []);
+    flattenToc(nav.toc || []);
+    state.chapters = spine.items.map(item => {
+        const key = item.href.split('#')[0];
+        const label = tocItems.get(key) || item.id || `章节 ${item.index + 1}`;
+        return { label: label, href: item.href };
+    });
     renderTOC();
     
+    // 2. 主动、同步地计算并设置好初始状态
     const saved = loadProgress(state.currentFileKey);
-    await state.rendition.display(saved?.href || state.chapters[0]?.href);
+    const location = saved?.href || state.chapters[0]?.href;
 
-    state.rendition.on('relocated', (location) => {
-        const cfi = location.start.cfi;
-        const href = state.book.canonical(cfi)?.split('#')[0] || location.start.href.split('#')[0];
-        const idx = state.chapters.findIndex(c => state.book.canonical(c.href).split('#')[0] === href);
-        if (idx >= 0 && state.currentIndex !== idx) {
-            state.currentIndex = idx;
+    const spineItem = state.book.spine.get(location);
+    state.currentIndex = spineItem ? spineItem.index : 0;
+
+    // 3. 在显示内容前，强制更新UI，确保目录和导航栏正确
+    updateActiveTOC();
+    renderChapterNav();
+
+    // 4. 'relocated' 事件现在只负责在章节变化时更新UI
+    state.rendition.on('relocated', (relocatedEvent) => {
+        if (state.isNavigating) {
+            return; // 如果是程序化导航（用户点击），则忽略此事件
+        }
+        const spineIndex = relocatedEvent.start.index;
+        if (spineIndex >= 0 && state.currentIndex !== spineIndex) {
+            state.currentIndex = spineIndex;
             updateActiveTOC();
             renderChapterNav();
         }
-        saveProgress(state.currentFileKey, { href: cfi });
     });
-    renderChapterNav();
+
+    // 5. 最后，显示书籍内容
+    await state.rendition.display(location);
+
   } catch (err) {
     console.error('Error opening EPUB:', err);
     alert('打开 EPUB 出错。可能文件损坏或受DRM保护。');
@@ -355,10 +443,10 @@ function displayTxtChapter(idx) {
   updateActiveTOC();
   renderChapterNav();
   applyFontSize();
-  saveProgress(state.currentFileKey, { idx });
+  // TXT 格式下，手动保存按钮也会生效
 }
 
-// ---------- UI & Common Functions ----------
+// ---------- UI & Navigation Functions ----------
 function clearReader() {
   readerInner.innerHTML = '';
   chapterNav.innerHTML = '';
@@ -377,7 +465,7 @@ function renderTOC() {
   state.chapters.forEach((c, i) => {
     const el = document.createElement('div');
     el.className = 'chapter-item';
-    el.textContent = c.label || ('第' + (i + 1) + '章');
+    el.textContent = c.label;
     el.dataset.index = i;
     toc.appendChild(el);
   });
@@ -408,26 +496,69 @@ function renderChapterNav() {
 }
 
 function goToChapter(index) {
-    if (index < 0 || index >= state.chapters.length) return;
+    if (index < 0 || index >= state.chapters.length || state.isNavigating) return;
+    
+    state.isNavigating = true; // 上锁
+    
     state.currentIndex = index;
+    updateActiveTOC();
+    renderChapterNav();
+
     if (state.type === 'txt') {
         displayTxtChapter(index);
+        state.isNavigating = false; // TXT是同步操作，立即解锁
     } else if (state.type === 'epub') {
-        state.rendition.display(state.chapters[index].href);
-        updateActiveTOC();
-        renderChapterNav();
+        state.rendition.display(state.chapters[index].href).then(() => {
+            // 在EPUB异步显示完成后再解锁
+            setTimeout(() => {
+                state.isNavigating = false;
+            }, 100);
+        });
     }
 }
 
 function goToPreviousChapter() { goToChapter(state.currentIndex - 1); }
 function goToNextChapter() { goToChapter(state.currentIndex + 1); }
 
-
-// ---------- Utility Functions (使用 localStorage 保存进度) ----------
+// ---------- Utility Functions ----------
 function getFileKey(bookPath) { return 'server_reader_' + bookPath; }
-function saveProgress(key, data) { if (!key) return; try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) { console.warn(e) } }
-function loadProgress(key) { if (!key) return null; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch (e) { return null } }
 
+/**
+ * 新增：手动保存进度的函数
+ */
+function manualSaveProgress() {
+    if (state.type === 'epub') {
+        if (!state.rendition) return;
+        // rendition.currentLocation() 是获取当前精确位置的最可靠方法
+        const location = state.rendition.currentLocation();
+        if (location && location.start) {
+            saveProgress(state.currentFileKey, { href: location.start.cfi });
+        }
+    } else if (state.type === 'txt') {
+        // 对于 TXT，我们保存当前的章节索引
+        saveProgress(state.currentFileKey, { idx: state.currentIndex });
+    }
+}
+
+function saveProgress(key, data) { 
+    if (!key) return; 
+    try { 
+        localStorage.setItem(key, JSON.stringify(data)); 
+        const indicator = document.getElementById('save-indicator');
+        if (indicator) {
+            indicator.style.opacity = '1';
+            setTimeout(() => { indicator.style.opacity = '0'; }, 1500);
+        }
+    } catch (e) { console.warn(e); } 
+}
+
+function loadProgress(key) { 
+    if (!key) return null; 
+    try { 
+        const raw = localStorage.getItem(key); 
+        return raw ? JSON.parse(raw) : null; 
+    } catch (e) { return null; } 
+}
 </script>
 </body>
 </html>
