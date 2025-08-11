@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>本地电子书阅读器</title>
+  <style>
+    :root{ 
+      --bg: #FAF7ED;
+      --page-bg: #EBEBEB;
+      --text: #3D3D3D;
+      --accent: #DB2828;
+      --muted: #888888;
+      --border-color: #E0E0E0;
+      --hover-bg: #F0F0F0;
+      --shadow-color: rgba(0,0,0,0.08);
+      --toolbar-bg: #FFFFFF;
+    }
+    [data-theme="dark"]{ 
+      --bg: #121212;
+      --page-bg: #0A0A0A;
+      --text: #BDBDBD;
+      --accent: #D4AF37;
+      --muted: #757575;
+      --border-color: #2C2C2C;
+      --hover-bg: #252525;
+      --shadow-color: rgba(0,0,0,0.4);
+      --toolbar-bg: #1E1E1E;
+    }
+    *{
+      box-sizing: border-box;
+    }
+    body, .sidebar, .reader, .right-toolbar, .book-item, .chapter-item, button {
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    body{
+      margin:0;
+      background: var(--page-bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      overflow: hidden;
+    }
+    .container{
+      display:flex;
+      height: 100vh;
+      padding-top: 30px;
+    }
+    .sidebar{
+      width: 320px;
+      flex-shrink: 0;
+      background: var(--bg);
+      border-right: 1px solid var(--border-color);
+      overflow: hidden;
+      transition: margin-left 0.3s ease-in-out;
+      margin-left: -320px;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar.visible {
+      margin-left: 0;
+    }
+    .main{
+      flex:1;
+      display:flex;
+      justify-content: center;
+      padding: 0 30px;
+      overflow: auto;
+    }
+    .reader{
+      max-width: 800px;
+      width:100%;
+      background: var(--bg);
+      padding: 30px 40px;
+      border-radius: 4px;
+      box-shadow:0 2px 10px var(--shadow-color);
+      height: fit-content;
+      min-height: 95%;
+      font-size: 18px; 
+    }
+    #book-meta {
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 20px;
+        color: var(--muted);
+        font-size: 14px;
+    }
+    .bookshelf-view, .toc-view {
+        display: none;
+        flex-direction: column;
+        height: 100%;
+    }
+    .sidebar.show-bookshelf .bookshelf-view,
+    .sidebar.show-toc .toc-view {
+        display: flex;
+    }
+    .bookshelf{padding:12px; flex-grow: 1; overflow-y: auto;}
+    .book-item{display:flex;align-items:center;gap:8px;padding:8px;border-radius:6px;cursor:pointer}
+    .book-item:hover{background: var(--hover-bg)}
+    .chapter-list-container { flex-grow: 1; overflow-y: auto; }
+    .chapter-list{padding:12px;}
+    .chapter-item{padding:8px 10px;border-radius:4px;cursor:pointer}
+    .chapter-item:hover{background: var(--hover-bg)}
+    .chapter-item.active{background: var(--accent);color: #fff;font-weight:600}
+    [data-theme="dark"] .chapter-item.active { color: #111; }
+
+    input[type=file]{display:none}
+    .muted{color:var(--muted);font-size:13px}
+    .reader h1{font-size:1.33em; font-weight: 600; margin:6px 0 24px; text-align: center;}
+    .reader p{font-size:1em;line-height:2;text-indent:2em}
+    .epub-container{width:100%; min-height:300px}
+    
+    .right-toolbar {
+        position: fixed; top: 50%; right: 20px; transform: translateY(-50%);
+        display: flex; flex-direction: column; gap: 1px;
+        background: var(--toolbar-bg); border-radius: 8px;
+        box-shadow: 0 4px 12px var(--shadow-color);
+        border: 1px solid var(--border-color); z-index: 1000;
+    }
+    .right-toolbar button {
+        width: 50px; height: 50px; border: none; background: transparent; cursor: pointer;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 4px; font-size: 12px; color: var(--muted);
+    }
+    .right-toolbar button:hover { background: var(--hover-bg); color: var(--text); }
+    .right-toolbar button:first-child { border-radius: 8px 8px 0 0; }
+    .right-toolbar button:last-child { border-radius: 0 0 8px 8px; }
+    .right-toolbar button svg { width: 20px; height: 20px; stroke: currentColor; }
+    .toolbar-divider { height: 1px; background-color: var(--border-color); margin: 0 8px; }
+
+    #chapter-nav {
+        display: flex; justify-content: center; gap: 40px;
+        margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color);
+    }
+    #chapter-nav button {
+        background: transparent; border: 1px solid var(--border-color); color: var(--muted);
+        padding: 8px 20px; border-radius: 20px; cursor: pointer; font-size: 14px;
+    }
+    #chapter-nav button:hover { background: var(--hover-bg); color: var(--text); border-color: var(--text); }
+    #chapter-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    #refreshBookshelfBtn {
+        margin: 12px; padding: 10px; border-radius: 6px;
+        border: 1px solid var(--border-color); background: var(--hover-bg);
+        cursor: pointer; text-align: center; flex-shrink: 0;
+    }
+
+    @media(max-width:900px){
+      .container { padding-top: 15px; }
+      .sidebar{
+        position: fixed; left: 0; top: 0; height: 100%;
+        z-index: 1100; margin-left: -320px;
+      }
+      .sidebar.visible { margin-left: 0; }
+      .main { padding: 0 15px; }
+      .reader{ min-height: 98%; }
+      .right-toolbar { right: 10px; }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://unpkg.com/epubjs/dist/epub.min.js"></script>
+</head>
+<body data-theme="light">
+
+  <div class="right-toolbar">
+    <button id="tocToggleBtn" title="目录">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+      <span>目录</span>
+    </button>
+    <button id="bookshelfBtn" title="书架">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        <span>添加书架</span>
+    </button>
+    
+    <button id="fontIncreaseBtn" title="增大字体">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2"/><path d="M12 5v14"/><path d="M8 19h8"/><path d="M17 11h4"/><path d="M19 9v4"/></svg>
+      <span>增大</span>
+    </button>
+    <button id="fontDecreaseBtn" title="减小字体">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2"/><path d="M12 5v14"/><path d="M8 19h8"/><path d="M17 11h4"/></svg>
+      <span>减小</span>
+    </button>
+
+    <div class="toolbar-divider"></div>
+    <button id="openFileBtn" title="打开本地书籍">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+      <span>打开</span>
+    </button>
+    <button id="themeToggle" title="切换日/夜间模式">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      <span>夜间</span>
+    </button>
+  </div>
+
+  <div class="container">
+    <aside class="sidebar" id="sidebar">
+        <div class="bookshelf-view">
+            <div class="bookshelf">
+                <div style="font-weight:700">书架</div>
+                <div class="muted">点击右侧工具栏 "书架" 按钮选择文件夹</div>
+                <div id="bookshelfList"></div>
+            </div>
+            <button id="refreshBookshelfBtn">重新添加</button>
+        </div>
+        <div class="toc-view">
+            <div style="padding:12px;border-bottom:1px solid var(--border-color); flex-shrink: 0;">
+                <div style="font-weight:700">目录</div>
+            </div>
+            <div class="chapter-list-container">
+                <div id="toc" class="chapter-list"></div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main">
+      <div id="reader" class="reader">
+        <div id="book-meta"></div>
+        <div id="readerInner">
+          <h1>欢迎使用本地电子书阅读器</h1>
+          <p class="muted">点击右侧工具栏 "打开" 按钮选择本地书籍</p>
+        </div>
+        <div id="chapter-nav"></div>
+      </div>
+    </main>
+  </div>
+
+  <input id="dir-input" type="file" webkitdirectory directory multiple style="display:none" accept=".epub,.txt" />
+  <input id="file-input" type="file" accept=".epub,.txt" style="display:none" />
+
+<script>
+// ---------- State Management ----------
+let state = {
+  type: null, book: null, rendition: null, chapters: [], currentIndex: 0,
+  fontSize: 18, theme: 'light', txtPages: [], currentFileKey: null, bookshelf: [],
+  sidebarView: 'toc', bookshelfLoaded: false
+};
+
+// ---------- DOM Elements ----------
+const fileInput = document.getElementById('file-input');
+const dirInput = document.getElementById('dir-input');
+const toc = document.getElementById('toc');
+const reader = document.getElementById('reader');
+const readerInner = document.getElementById('readerInner');
+const bookshelfList = document.getElementById('bookshelfList');
+const sidebar = document.getElementById('sidebar');
+const tocToggleBtn = document.getElementById('tocToggleBtn');
+const bookshelfBtn = document.getElementById('bookshelfBtn');
+const openFileBtn = document.getElementById('openFileBtn');
+const themeToggle = document.getElementById('themeToggle');
+const bookMeta = document.getElementById('book-meta');
+const chapterNav = document.getElementById('chapter-nav');
+const refreshBookshelfBtn = document.getElementById('refreshBookshelfBtn');
+const fontIncreaseBtn = document.getElementById('fontIncreaseBtn');
+const fontDecreaseBtn = document.getElementById('fontDecreaseBtn');
+
+// ---------- Event Listeners ----------
+fileInput.addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  await openFile(f);
+  fileInput.value = '';
+});
+openFileBtn.addEventListener('click', () => fileInput.click());
+
+const openFolderAction = async () => {
+    if (window.showDirectoryPicker) {
+        try {
+            const dirHandle = await window.showDirectoryPicker();
+            const files = [];
+            async function traverse(handle, path = '') {
+                for await (const entry of handle.values()) {
+                    if (entry.kind === 'file' && (entry.name.toLowerCase().endsWith('.epub') || entry.name.toLowerCase().endsWith('.txt'))) {
+                        const file = await entry.getFile();
+                        file._relativePath = path ? (path + '/' + entry.name) : entry.name;
+                        files.push(file);
+                    } else if (entry.kind === 'directory') {
+                        await traverse(entry, path ? (path + '/' + entry.name) : entry.name);
+                    }
+                }
+            }
+            await traverse(dirHandle);
+            addFilesToBookshelf(files);
+        } catch (err) { console.warn('Directory selection cancelled:', err); }
+    } else {
+        dirInput.click();
+    }
+};
+
+bookshelfBtn.addEventListener('click', () => {
+    if (!state.bookshelfLoaded) {
+        openFolderAction();
+    } else {
+        toggleSidebar('bookshelf');
+    }
+});
+refreshBookshelfBtn.addEventListener('click', openFolderAction);
+
+dirInput.addEventListener('change', (e) => {
+  const files = Array.from(e.target.files);
+  files.forEach(f => { f._relativePath = f.webkitRelativePath || f.name });
+  addFilesToBookshelf(files);
+  dirInput.value = '';
+});
+
+function toggleSidebar(view) {
+    const bookshelfBtnLabel = bookshelfBtn.querySelector('span');
+    const isCurrentlyVisible = sidebar.classList.contains('visible');
+    const isSameView = state.sidebarView === view;
+
+    if (isCurrentlyVisible && isSameView) {
+        sidebar.classList.remove('visible');
+        bookshelfBtnLabel.textContent = state.bookshelfLoaded ? "打开书架" : "添加书架";
+    } else {
+        state.sidebarView = view;
+        sidebar.className = 'sidebar visible';
+        sidebar.classList.add(view === 'toc' ? 'show-toc' : 'show-bookshelf');
+        if (view === 'bookshelf') {
+            bookshelfBtnLabel.textContent = "关闭书架";
+        } else {
+            bookshelfBtnLabel.textContent = state.bookshelfLoaded ? "打开书架" : "添加书架";
+        }
+    }
+}
+
+tocToggleBtn.addEventListener('click', () => toggleSidebar('toc'));
+
+// ========== 修复主题切换问题 ==========
+themeToggle.addEventListener('click', async () => {
+  // 1. 更新 state 和页面主题
+  state.theme = (state.theme === 'light') ? 'dark' : 'light';
+  document.body.dataset.theme = state.theme;
+  const themeLabel = themeToggle.querySelector('span');
+  themeLabel.textContent = state.theme === 'light' ? '夜间' : '日间';
+
+  // 2. 如果EPUB正打开，需要重新应用主题
+  if (state.rendition && state.type === 'epub') {
+    try {
+      // 获取当前位置
+      const currentLocation = state.rendition.currentLocation();
+      const currentCfi = currentLocation ? currentLocation.start.cfi : null;
+      
+      // 选择新主题
+      state.rendition.themes.select(state.theme);
+      
+      // 强制重新渲染当前章节以确保主题生效
+      if (currentCfi) {
+        await state.rendition.display(currentCfi);
+      } else if (state.chapters[state.currentIndex]) {
+        await state.rendition.display(state.chapters[state.currentIndex].href);
+      }
+      
+      // 重新应用字体大小
+      state.rendition.themes.fontSize(state.fontSize + 'px');
+    } catch (error) {
+      console.warn('Theme switching error:', error);
+      // 如果出错，尝试简单的主题选择
+      state.rendition.themes.select(state.theme);
+    }
+  }
+});
+
+fontIncreaseBtn.addEventListener('click', () => changeFontSize(1));
+fontDecreaseBtn.addEventListener('click', () => changeFontSize(-1));
+
+// ---------- Font Size Functions ----------
+function applyFontSize() {
+  reader.style.fontSize = state.fontSize + 'px';
+  if (state.rendition) {
+    state.rendition.themes.fontSize(state.fontSize + 'px');
+  }
+}
+
+function changeFontSize(delta) {
+  const newSize = state.fontSize + delta;
+  if (newSize < 12 || newSize > 32) return; // Set min/max font size
+  state.fontSize = newSize;
+  applyFontSize();
+}
+
+// ========== 改进主题注册函数 ==========
+function registerEpubThemes() {
+    if (!state.rendition) return;
+    
+    const commonStyles = { 
+        "line-height": "2", 
+        "font-family": '"Microsoft YaHei", sans-serif', 
+        "padding": "0 !important",
+        "margin": "0 !important"
+    };
+    
+    // 注册亮色主题
+    state.rendition.themes.register("light", { 
+        "body": { 
+            ...commonStyles, 
+            "color": "#3D3D3D !important", 
+            "background-color": "#FAF7ED !important" 
+        },
+        "p": { "color": "#3D3D3D !important" },
+        "h1, h2, h3, h4, h5, h6": { "color": "#3D3D3D !important" },
+        "div": { "color": "#3D3D3D !important" }
+    });
+    
+    // 注册暗色主题
+    state.rendition.themes.register("dark", { 
+        "body": { 
+            ...commonStyles, 
+            "color": "#BDBDBD !important", 
+            "background-color": "#121212 !important" 
+        },
+        "p": { "color": "#BDBDBD !important" },
+        "h1, h2, h3, h4, h5, h6": { "color": "#BDBDBD !important" },
+        "div": { "color": "#BDBDBD !important" }
+    });
+}
+
+// ---------- File Handling & Reading ----------
+async function openFile(file) {
+  state.currentFileKey = getFileKey(file);
+  bookMeta.textContent = `书名: ${file.name}`;
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.epub')) {
+    state.type = 'epub';
+    await openEpub(file);
+  } else if (name.endsWith('.txt')) {
+    state.type = 'txt';
+    await openTxt(file);
+  }
+}
+
+async function openEpub(file) {
+  clearReader();
+  try {
+    state.book = ePub(file);
+    readerInner.innerHTML = '<div id="epub-container" class="epub-container"></div>';
+    if (state.rendition) state.rendition.destroy();
+    state.rendition = state.book.renderTo('epub-container', { flow: 'scrolled-doc', width: '100%' });
+    
+    registerEpubThemes();
+    state.rendition.themes.select(state.theme);
+    applyFontSize();
+
+    await state.book.ready;
+    const nav = await state.book.loaded.navigation;
+    state.chapters = [];
+    function walk(items) {
+      items.forEach(i => {
+        state.chapters.push({ label: i.label.trim(), href: i.href });
+        if (i.subitems && i.subitems.length) walk(i.subitems);
+      });
+    }
+    walk(nav.toc || []);
+    renderTOC();
+    
+    const saved = loadProgress(state.currentFileKey);
+    await state.rendition.display(saved?.href || state.chapters[0]?.href);
+
+    state.rendition.on('relocated', (location) => {
+        const cfi = location.start.cfi;
+        const href = state.book.canonical(cfi)?.split('#')[0] || location.start.href.split('#')[0];
+        const idx = state.chapters.findIndex(c => state.book.canonical(c.href).split('#')[0] === href);
+        if (idx >= 0 && state.currentIndex !== idx) {
+            state.currentIndex = idx;
+            updateActiveTOC();
+            renderChapterNav();
+        }
+        saveProgress(state.currentFileKey, { href: cfi });
+    });
+    renderChapterNav();
+  } catch (err) {
+    console.error('Error opening EPUB:', err);
+    alert('打开 EPUB 出错。可能文件损坏或受DRM保护。');
+  }
+}
+
+async function openTxt(file) {
+    clearReader();
+    const text = await readTxtFileWithEncoding(file);
+    const chapterRegex = /(^\s*第[零一二三四五六七八九十百千万\d\s]+章.*$)/m;
+    const parts = text.split(chapterRegex);
+    state.chapters = [];
+    state.txtPages = [];
+    let intro = parts.shift()?.trim();
+    if (intro) {
+        state.chapters.push({ label: '前言', href: '#txt-0' });
+        state.txtPages.push(intro);
+    }
+    for (let i = 0; i < parts.length; i += 2) {
+        const title = parts[i]?.trim();
+        const content = parts[i + 1];
+        if (title) {
+            state.chapters.push({ label: title, href: '#txt-' + state.chapters.length });
+            state.txtPages.push((title + '\n\n' + (content || '')).trim());
+        }
+    }
+    if (state.chapters.length === 0) {
+        state.chapters = [{ label: file.name, href: '#txt-0' }];
+        state.txtPages = [text];
+    }
+    renderTOC();
+    const saved = loadProgress(state.currentFileKey);
+    displayTxtChapter(saved?.idx || 0);
+}
+
+function displayTxtChapter(idx) {
+  if (idx < 0 || idx >= state.txtPages.length) return;
+  state.currentIndex = idx;
+  const raw = state.txtPages[idx] || '';
+  const lines = raw.replace(/\r/g, '').split('\n');
+  const titleText = state.chapters[idx]?.label || lines[0] || '';
+  const contentHtml = lines.map(line => {
+    if (line.trim() === '') return '<br>';
+    return '<p>' + line.trim().replace(/</g, '&lt;') + '</p>';
+  }).join('');
+  
+  readerInner.innerHTML = `<h1>${titleText}</h1>${contentHtml}`;
+  updateActiveTOC();
+  renderChapterNav();
+  applyFontSize();
+  saveProgress(state.currentFileKey, { idx });
+}
+
+// ---------- UI & Common Functions ----------
+function clearReader() {
+  readerInner.innerHTML = '';
+  chapterNav.innerHTML = '';
+  if (state.rendition) { state.rendition.destroy(); state.rendition = null; }
+  state.chapters = [];
+  state.currentIndex = 0;
+  toc.innerHTML = '<div class="muted" style="padding: 10px;">加载目录...</div>';
+}
+
+function renderTOC() {
+  toc.innerHTML = '';
+  if (state.chapters.length === 0) {
+    toc.innerHTML = '<div class="muted" style="padding: 10px;">无目录信息</div>';
+    return;
+  }
+  state.chapters.forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'chapter-item';
+    el.textContent = c.label || ('第' + (i + 1) + '章');
+    el.dataset.index = i;
+    toc.appendChild(el);
+  });
+  updateActiveTOC();
+  toc.onclick = (e) => {
+    const targetEl = e.target.closest('.chapter-item');
+    if (!targetEl) return;
+    goToChapter(parseInt(targetEl.dataset.index, 10));
+  };
+}
+
+function updateActiveTOC() {
+  Array.from(toc.children).forEach((el, idx) => {
+    el.classList.toggle('active', idx === state.currentIndex);
+    if (idx === state.currentIndex && el.scrollIntoView) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+}
+
+function renderChapterNav() {
+    chapterNav.innerHTML = `
+        <button id="prevChapBtn" ${state.currentIndex === 0 ? 'disabled' : ''}>上一章</button>
+        <button id="nextChapBtn" ${state.currentIndex >= state.chapters.length - 1 ? 'disabled' : ''}>下一章</button>
+    `;
+    document.getElementById('prevChapBtn').onclick = goToPreviousChapter;
+    document.getElementById('nextChapBtn').onclick = goToNextChapter;
+}
+
+function goToChapter(index) {
+    if (index < 0 || index >= state.chapters.length) return;
+    state.currentIndex = index;
+    if (state.type === 'txt') {
+        displayTxtChapter(index);
+    } else if (state.type === 'epub') {
+        state.rendition.display(state.chapters[index].href);
+        updateActiveTOC();
+        renderChapterNav();
+    }
+}
+
+function goToPreviousChapter() { goToChapter(state.currentIndex - 1); }
+function goToNextChapter() { goToChapter(state.currentIndex + 1); }
+
+
+// ---------- Utility Functions ----------
+function getFileKey(file) { return 'qidian_reader_' + (file._relativePath || file.name); }
+function saveProgress(key, data) { if (!key) return; try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) { console.warn(e) } }
+function loadProgress(key) { if (!key) return null; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch (e) { return null } }
+async function readTxtFileWithEncoding(file) {
+    try { return await readFileAsText(file, 'UTF-8'); }
+    catch (e) { try { return await readFileAsText(file, 'GBK'); }
+    catch (err) { alert('无法解码TXT文件。'); return ''; } }
+}
+function readFileAsText(file, encoding) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file, encoding);
+  });
+}
+function addFilesToBookshelf(files) {
+  state.bookshelf = [];
+  files.forEach(f => {
+    const lower = f.name.toLowerCase();
+    if (!(lower.endsWith('.epub') || lower.endsWith('.txt'))) return;
+    const id = f._relativePath || f.name;
+    if (!state.bookshelf.some(b => b.id === id)) {
+        state.bookshelf.push({ id, file: f, name: f.name, path: f._relativePath || '' });
+    }
+  });
+  renderBookshelf();
+  if (state.bookshelf.length > 0) {
+      state.bookshelfLoaded = true;
+      toggleSidebar('bookshelf');
+  }
+}
+function renderBookshelf() {
+  bookshelfList.innerHTML = '';
+  if (state.bookshelf.length === 0) {
+    bookshelfList.innerHTML = '<div class="muted" style="padding: 10px;">书架为空</div>';
+    return;
+  }
+  state.bookshelf.forEach((b) => {
+    const el = document.createElement('div');
+    el.className = 'book-item';
+    el.innerHTML = `<div style="flex:1"><div style="font-weight:600">${b.name}</div><div class="muted" style="font-size:12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${b.path || ''}</div></div>`;
+    el.onclick = () => openFile(b.file);
+    bookshelfList.appendChild(el);
+  });
+}
+
+</script>
+</body>
+</html>
