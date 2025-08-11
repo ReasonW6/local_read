@@ -119,6 +119,32 @@
     #chapter-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
     #refreshBookshelfBtn { margin: 12px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--hover-bg); cursor: pointer; text-align: center; flex-shrink: 0; }
     #save-indicator { position: fixed; bottom: 20px; right: 100px; background-color: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 5px; opacity: 0; transition: opacity 0.5s ease; z-index: 2000; pointer-events: none; }
+    /* 新增：最近阅读样式 */
+    .book-item.last-read {
+        border: 2px solid var(--accent);
+        background: linear-gradient(135deg, var(--accent)15, transparent);
+        position: relative;
+    }
+    .book-item.last-read::before {
+        content: "最近阅读";
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: var(--accent);
+        color: white;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 8px;
+        font-weight: 600;
+        z-index: 1;
+    }
+    [data-theme="dark"] .book-item.last-read::before {
+        color: #111;
+    }
+    .book-item.last-read .book-title {
+        font-weight: 700;
+        color: var(--accent);
+    }
     @media(max-width:900px){ .container { padding-top: 15px; } .sidebar{ position: fixed; left: 0; top: 0; height: 100%; z-index: 1100; margin-left: -320px; } .sidebar.visible { margin-left: 0; } .main { padding: 0 15px; } .reader{ min-height: 98%; } .right-toolbar { right: 10px; } }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -194,7 +220,8 @@ let state = {
   type: null, book: null, rendition: null, chapters: [], currentIndex: 0,
   fontSize: 18, theme: 'light', txtPages: [], currentFileKey: null, bookshelf: [],
   sidebarView: 'toc',
-  isNavigating: false
+  isNavigating: false,
+  lastReadBook: null // 新增：记录最后阅读的书籍
 };
 
 // ---------- DOM Elements ----------
@@ -229,6 +256,8 @@ async function loadBookshelf() {
     if (!response.ok) throw new Error('Failed to fetch bookshelf');
     const books = await response.json();
     state.bookshelf = books;
+    // 加载最后阅读的书籍信息
+    loadLastReadBook();
     renderBookshelf();
     toggleSidebar('bookshelf');
   } catch (error) {
@@ -243,10 +272,32 @@ function renderBookshelf() {
     bookshelfList.innerHTML = '<div class="muted" style="padding: 10px;">书架为空，请将书籍文件放入 "books" 文件夹后点击 "刷新书架"。</div>';
     return;
   }
-  state.bookshelf.forEach((book) => {
+  
+  // 按最后阅读状态排序，最后阅读的书籍排在最前面
+  const sortedBooks = [...state.bookshelf].sort((a, b) => {
+    const aIsLastRead = state.lastReadBook && a.path === state.lastReadBook.path;
+    const bIsLastRead = state.lastReadBook && b.path === state.lastReadBook.path;
+    if (aIsLastRead && !bIsLastRead) return -1;
+    if (!aIsLastRead && bIsLastRead) return 1;
+    return 0;
+  });
+  
+  sortedBooks.forEach((book) => {
     const el = document.createElement('div');
     el.className = 'book-item';
-    el.innerHTML = `<div style="flex:1"><div style="font-weight:600">${book.name}</div><div class="muted" style="font-size:12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${book.path}</div></div>`;
+    
+    // 检查是否是最后阅读的书籍
+    const isLastRead = state.lastReadBook && book.path === state.lastReadBook.path;
+    if (isLastRead) {
+      el.classList.add('last-read');
+    }
+    
+    el.innerHTML = `
+      <div style="flex:1">
+        <div class="${isLastRead ? 'book-title' : ''}" style="font-weight:600">${book.name}</div>
+        <div class="muted" style="font-size:12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${book.path}</div>
+      </div>
+    `;
     el.onclick = () => openBookFromServer(book);
     bookshelfList.appendChild(el);
   });
@@ -258,6 +309,10 @@ async function openBookFromServer(book) {
         if (!response.ok) throw new Error(`Book not found or failed to load: ${book.name}`);
         const fileData = await response.arrayBuffer();
         state.currentFileKey = getFileKey(book.path);
+        
+        // 保存最后阅读的书籍信息
+        saveLastReadBook(book);
+        
         bookMeta.textContent = `书名: ${book.name}`;
         const name = book.name.toLowerCase();
         if (name.endsWith('.epub')) {
@@ -558,6 +613,42 @@ function loadProgress(key) {
         const raw = localStorage.getItem(key); 
         return raw ? JSON.parse(raw) : null; 
     } catch (e) { return null; } 
+}
+
+/**
+ * 新增：最后阅读书籍管理函数
+ */
+function saveLastReadBook(book) {
+    try {
+        const lastReadData = {
+            path: book.path,
+            name: book.name,
+            timestamp: Date.now()
+        };
+        localStorage.setItem('lastReadBook', JSON.stringify(lastReadData));
+        state.lastReadBook = lastReadData;
+    } catch (e) {
+        console.warn('Failed to save last read book:', e);
+    }
+}
+
+function loadLastReadBook() {
+    try {
+        const stored = localStorage.getItem('lastReadBook');
+        if (stored) {
+            state.lastReadBook = JSON.parse(stored);
+            // 验证书籍是否仍在书架上
+            const bookExists = state.bookshelf.some(book => book.path === state.lastReadBook.path);
+            if (!bookExists) {
+                // 如果书籍不在当前书架上，清除记录
+                state.lastReadBook = null;
+                localStorage.removeItem('lastReadBook');
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load last read book:', e);
+        state.lastReadBook = null;
+    }
 }
 </script>
 </body>
