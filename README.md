@@ -22,6 +22,7 @@
 ├── server.js         <-- 后端服务器，负责读取文件和提供API
 ├── package.json      <-- 项目配置文件
 ├── package-lock.json <-- 锁定依赖版本
+├── start.bat         <-- 一键启动脚本
 └── README.md         <-- 项目说明文档
 ```
 
