@@ -48,7 +48,10 @@
 
 在项目的根目录下，打开终端或命令行工具，然后运行以下命令来安装 Express 框架：
 ```Bash
-    npm install
+    #初始化项目
+    npm init -y
+    #安装 Express 框架
+    npm install express
 ```
 **4. 添加你的书籍:**
 
@@ -66,7 +69,7 @@
 ```
 **或者**  
 
-打开`start.bat`，会自动帮你运行server，并打开浏览器。
+打开`start.bat`，会自动帮你运行server并打开浏览器。
 
 **6. 开始阅读:**
 
