@@ -48,10 +48,10 @@
 
 在项目的根目录下，打开终端或命令行工具，然后运行以下命令来安装 Express 框架：
 ```Bash
-    #初始化项目
-    npm init -y
-    #安装 Express 框架
-    npm install express
+#初始化项目
+npm init -y
+#安装 Express 框架
+npm install express
 ```
 **4. 添加你的书籍:**
 
@@ -61,11 +61,11 @@
 
 在终端中运行以下命令：
 ```Bash
-    node server.js
+node server.js
 ```
 当你看到以下提示时，说明服务器已成功启动：
 ```
-    E-book reader server listening at http://localhost:3000
+E-book reader server listening at http://localhost:3000
 ```
 **或者**  
 
