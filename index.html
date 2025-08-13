@@ -84,13 +84,14 @@
         color: var(--muted);
         font-size: 14px;
     }
-    .bookshelf-view, .toc-view {
+    .bookshelf-view, .toc-view, .bookmark-view {
         display: none;
         flex-direction: column;
         height: 100%;
     }
     .sidebar.show-bookshelf .bookshelf-view,
-    .sidebar.show-toc .toc-view {
+    .sidebar.show-toc .toc-view,
+    .sidebar.show-bookmark .bookmark-view {
         display: flex;
     }
     .bookshelf{padding:12px; flex-grow: 1; overflow-y: auto;}
@@ -145,6 +146,51 @@
         font-weight: 700;
         color: var(--accent);
     }
+    /* 新增：书签样式 */
+    .bookmark-item {
+        position: relative;
+        padding: 8px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        border-left: 3px solid var(--accent);
+        margin-bottom: 4px;
+    }
+    .bookmark-item:hover {
+        background: var(--hover-bg);
+    }
+    .bookmark-item .bookmark-title {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 4px;
+    }
+    .bookmark-item .bookmark-location {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 2px;
+    }
+    .bookmark-item .bookmark-time {
+        font-size: 11px;
+        color: var(--muted);
+        opacity: 0.7;
+    }
+    .bookmark-item .bookmark-delete {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 16px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+    .bookmark-item:hover .bookmark-delete {
+        opacity: 1;
+    }
+    .bookmark-item .bookmark-delete:hover {
+        color: var(--accent);
+    }
     @media(max-width:900px){ .container { padding-top: 15px; } .sidebar{ position: fixed; left: 0; top: 0; height: 100%; z-index: 1100; margin-left: -320px; } .sidebar.visible { margin-left: 0; } .main { padding: 0 15px; } .reader{ min-height: 98%; } .right-toolbar { right: 10px; } }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -161,6 +207,10 @@
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
       <span>书架</span>
     </button>
+    <button id="bookmarkListBtn" title="书签">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path></svg>
+      <span>书签</span>
+    </button>
     <button id="fontIncreaseBtn" title="增大字体">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2"/><path d="M12 5v14"/><path d="M8 19h8"/><path d="M17 11h4"/><path d="M19 9v4"/></svg>
       <span>增大</span>
@@ -176,6 +226,10 @@
     </button>
     <!-- 新增：手动保存按钮 -->
     <div class="toolbar-divider"></div>
+    <button id="addBookmarkBtn" title="添加书签">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path><line x1="12" y1="7" x2="12" y2="13"></line><line x1="9" y1="10" x2="15" y2="10"></line></svg>
+      <span>书签</span>
+    </button>
     <button id="saveProgressBtn" title="手动保存进度">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
       <span>保存</span>
@@ -197,6 +251,17 @@
             </div>
             <div class="chapter-list-container">
                 <div id="toc" class="chapter-list"></div>
+            </div>
+        </div>
+        <div class="bookmark-view">
+            <div style="padding:12px;border-bottom:1px solid var(--border-color); flex-shrink: 0;">
+                <div style="font-weight:700; display: flex; justify-content: space-between; align-items: center;">
+                    <span>书签</span>
+                    <button id="clearAllBookmarksBtn" style="background: none; border: 1px solid var(--border-color); color: var(--muted); padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer;" title="清空所有书签">清空</button>
+                </div>
+            </div>
+            <div class="chapter-list-container">
+                <div id="bookmarkList" class="chapter-list"></div>
             </div>
         </div>
     </aside>
@@ -221,7 +286,8 @@ let state = {
   fontSize: 18, theme: 'light', txtPages: [], currentFileKey: null, bookshelf: [],
   sidebarView: 'toc',
   isNavigating: false,
-  lastReadBook: null // 新增：记录最后阅读的书籍
+  lastReadBook: null, // 新增：记录最后阅读的书籍
+  bookmarks: [] // 新增：书签数组
 };
 
 // ---------- DOM Elements ----------
@@ -232,6 +298,7 @@ const bookshelfList = document.getElementById('bookshelfList');
 const sidebar = document.getElementById('sidebar');
 const tocToggleBtn = document.getElementById('tocToggleBtn');
 const bookshelfBtn = document.getElementById('bookshelfBtn');
+const bookmarkListBtn = document.getElementById('bookmarkListBtn');
 const themeToggle = document.getElementById('themeToggle');
 const bookMeta = document.getElementById('book-meta');
 const chapterNav = document.getElementById('chapter-nav');
@@ -239,15 +306,21 @@ const refreshBookshelfBtn = document.getElementById('refreshBookshelfBtn');
 const fontIncreaseBtn = document.getElementById('fontIncreaseBtn');
 const fontDecreaseBtn = document.getElementById('fontDecreaseBtn');
 const saveProgressBtn = document.getElementById('saveProgressBtn'); // 新增
+const addBookmarkBtn = document.getElementById('addBookmarkBtn'); // 新增
+const bookmarkList = document.getElementById('bookmarkList'); // 新增
+const clearAllBookmarksBtn = document.getElementById('clearAllBookmarksBtn'); // 新增
 
 // ---------- Event Listeners ----------
 document.addEventListener('DOMContentLoaded', loadBookshelf);
 bookshelfBtn.addEventListener('click', () => toggleSidebar('bookshelf'));
+bookmarkListBtn.addEventListener('click', () => toggleSidebar('bookmark'));
 refreshBookshelfBtn.addEventListener('click', loadBookshelf);
 tocToggleBtn.addEventListener('click', () => toggleSidebar('toc'));
 fontIncreaseBtn.addEventListener('click', () => changeFontSize(1));
 fontDecreaseBtn.addEventListener('click', () => changeFontSize(-1));
 saveProgressBtn.addEventListener('click', manualSaveProgress); // 新增
+addBookmarkBtn.addEventListener('click', addBookmark); // 新增
+clearAllBookmarksBtn.addEventListener('click', clearAllBookmarks); // 新增
 
 // ---------- Helper Functions ----------
 async function loadBookshelf() {
@@ -313,6 +386,9 @@ async function openBookFromServer(book) {
         // 保存最后阅读的书籍信息
         saveLastReadBook(book);
         
+        // 加载书签
+        loadBookmarks();
+        
         bookMeta.textContent = `书名: ${book.name}`;
         const name = book.name.toLowerCase();
         if (name.endsWith('.epub')) {
@@ -347,7 +423,14 @@ function toggleSidebar(view) {
     } else {
         state.sidebarView = view;
         sidebar.className = 'sidebar visible';
-        sidebar.classList.add(view === 'toc' ? 'show-toc' : 'show-bookshelf');
+        if (view === 'toc') {
+            sidebar.classList.add('show-toc');
+        } else if (view === 'bookshelf') {
+            sidebar.classList.add('show-bookshelf');
+        } else if (view === 'bookmark') {
+            sidebar.classList.add('show-bookmark');
+            loadBookmarks(); // 加载书签列表
+        }
     }
 }
 
@@ -613,6 +696,249 @@ function loadProgress(key) {
         const raw = localStorage.getItem(key); 
         return raw ? JSON.parse(raw) : null; 
     } catch (e) { return null; } 
+}
+
+/**
+ * 新增：书签功能
+ */
+
+// 获取当前阅读位置
+function getCurrentReadingLocation() {
+    if (state.type === 'epub' && state.rendition) {
+        const location = state.rendition.currentLocation();
+        if (location && location.start) {
+            return {
+                type: 'epub',
+                cfi: location.start.cfi,
+                href: location.start.href,
+                chapterTitle: state.chapters[state.currentIndex]?.label || '未知章节'
+            };
+        }
+    } else if (state.type === 'txt') {
+        return {
+            type: 'txt',
+            chapterIndex: state.currentIndex,
+            chapterTitle: state.chapters[state.currentIndex]?.label || '未知章节'
+        };
+    }
+    return null;
+}
+
+// 添加书签
+function addBookmark() {
+    if (!state.currentFileKey || !state.chapters.length) {
+        alert('请先打开一本书');
+        return;
+    }
+
+    const location = getCurrentReadingLocation();
+    if (!location) {
+        alert('无法获取当前阅读位置');
+        return;
+    }
+
+    // 生成简单的用户输入对话框来命名书签
+    let bookmarkTitle = prompt('请为书签命名 (留空将使用默认名称):', location.chapterTitle);
+    if (bookmarkTitle === null) return; // 用户取消
+
+    if (!bookmarkTitle.trim()) {
+        bookmarkTitle = location.chapterTitle;
+    }
+
+    const bookmark = {
+        id: Date.now().toString(),
+        title: bookmarkTitle.trim(),
+        bookKey: state.currentFileKey,
+        bookName: state.book ? (state.book.package ? state.book.package.metadata.title : '当前书籍') : '当前书籍',
+        location: location,
+        createdAt: new Date().toLocaleString('zh-CN')
+    };
+
+    // 保存书签
+    saveBookmark(bookmark);
+    
+    // 显示成功提示
+    const indicator = document.getElementById('save-indicator');
+    if (indicator) {
+        indicator.textContent = '书签已添加';
+        indicator.style.opacity = '1';
+        setTimeout(() => { 
+            indicator.style.opacity = '0';
+            setTimeout(() => {
+                indicator.textContent = '已保存';
+            }, 500);
+        }, 1500);
+    }
+
+    // 如果书签面板是打开的，刷新显示
+    if (state.sidebarView === 'bookmark' && sidebar.classList.contains('visible')) {
+        renderBookmarkList();
+    }
+}
+
+// 保存书签到localStorage
+function saveBookmark(bookmark) {
+    const bookmarks = getBookmarksForCurrentBook();
+    bookmarks.push(bookmark);
+    
+    try {
+        const allBookmarks = JSON.parse(localStorage.getItem('bookmarks') || '{}');
+        allBookmarks[state.currentFileKey] = bookmarks;
+        localStorage.setItem('bookmarks', JSON.stringify(allBookmarks));
+    } catch (e) {
+        console.warn('Failed to save bookmark:', e);
+    }
+}
+
+// 获取当前书籍的所有书签
+function getBookmarksForCurrentBook() {
+    if (!state.currentFileKey) return [];
+    
+    try {
+        const allBookmarks = JSON.parse(localStorage.getItem('bookmarks') || '{}');
+        return allBookmarks[state.currentFileKey] || [];
+    } catch (e) {
+        console.warn('Failed to load bookmarks:', e);
+        return [];
+    }
+}
+
+// 加载并显示书签列表
+function loadBookmarks() {
+    const bookmarks = getBookmarksForCurrentBook();
+    state.bookmarks = bookmarks;
+    renderBookmarkList();
+}
+
+// 渲染书签列表
+function renderBookmarkList() {
+    if (!bookmarkList) return;
+    
+    bookmarkList.innerHTML = '';
+    
+    if (state.bookmarks.length === 0) {
+        bookmarkList.innerHTML = '<div class="muted" style="padding: 10px;">暂无书签，在阅读时点击"书签"按钮添加。</div>';
+        return;
+    }
+    
+    // 按创建时间倒序排列（最新的在前面）
+    const sortedBookmarks = [...state.bookmarks].sort((a, b) => {
+        return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+    
+    sortedBookmarks.forEach(bookmark => {
+        const el = document.createElement('div');
+        el.className = 'bookmark-item';
+        el.innerHTML = `
+            <div class="bookmark-title">${bookmark.title}</div>
+            <div class="bookmark-location">${bookmark.location.chapterTitle}</div>
+            <div class="bookmark-time">${bookmark.createdAt}</div>
+            <button class="bookmark-delete" onclick="removeBookmark('${bookmark.id}')" title="删除书签">×</button>
+        `;
+        
+        el.onclick = (e) => {
+            if (e.target.className !== 'bookmark-delete') {
+                goToBookmark(bookmark);
+            }
+        };
+        
+        bookmarkList.appendChild(el);
+    });
+}
+
+// 跳转到书签位置
+function goToBookmark(bookmark) {
+    if (!bookmark.location) return;
+    
+    const location = bookmark.location;
+    
+    if (location.type === 'epub' && state.type === 'epub' && state.rendition) {
+        state.isNavigating = true;
+        state.rendition.display(location.cfi).then(() => {
+            // 更新当前章节索引
+            const spineItem = state.book.spine.get(location.href);
+            if (spineItem) {
+                state.currentIndex = spineItem.index;
+                updateActiveTOC();
+                renderChapterNav();
+            }
+            setTimeout(() => {
+                state.isNavigating = false;
+            }, 100);
+        });
+    } else if (location.type === 'txt' && state.type === 'txt') {
+        goToChapter(location.chapterIndex);
+    }
+    
+    // 关闭侧边栏
+    sidebar.classList.remove('visible');
+}
+
+// 删除书签
+function removeBookmark(bookmarkId) {
+    if (!confirm('确定要删除这个书签吗？')) return;
+    
+    try {
+        const allBookmarks = JSON.parse(localStorage.getItem('bookmarks') || '{}');
+        const currentBookmarks = allBookmarks[state.currentFileKey] || [];
+        
+        allBookmarks[state.currentFileKey] = currentBookmarks.filter(b => b.id !== bookmarkId);
+        localStorage.setItem('bookmarks', JSON.stringify(allBookmarks));
+        
+        // 更新状态并重新渲染
+        loadBookmarks();
+        
+        // 显示删除成功提示
+        const indicator = document.getElementById('save-indicator');
+        if (indicator) {
+            indicator.textContent = '书签已删除';
+            indicator.style.opacity = '1';
+            setTimeout(() => { 
+                indicator.style.opacity = '0';
+                setTimeout(() => {
+                    indicator.textContent = '已保存';
+                }, 500);
+            }, 1500);
+        }
+    } catch (e) {
+        console.warn('Failed to remove bookmark:', e);
+        alert('删除书签失败');
+    }
+}
+
+// 清空当前书籍的所有书签
+function clearAllBookmarks() {
+    if (state.bookmarks.length === 0) {
+        alert('当前书籍没有书签');
+        return;
+    }
+    
+    if (!confirm(`确定要清空当前书籍的所有 ${state.bookmarks.length} 个书签吗？此操作不可撤销。`)) return;
+    
+    try {
+        const allBookmarks = JSON.parse(localStorage.getItem('bookmarks') || '{}');
+        allBookmarks[state.currentFileKey] = [];
+        localStorage.setItem('bookmarks', JSON.stringify(allBookmarks));
+        
+        // 更新状态并重新渲染
+        loadBookmarks();
+        
+        // 显示清空成功提示
+        const indicator = document.getElementById('save-indicator');
+        if (indicator) {
+            indicator.textContent = '书签已清空';
+            indicator.style.opacity = '1';
+            setTimeout(() => { 
+                indicator.style.opacity = '0';
+                setTimeout(() => {
+                    indicator.textContent = '已保存';
+                }, 500);
+            }, 1500);
+        }
+    } catch (e) {
+        console.warn('Failed to clear bookmarks:', e);
+        alert('清空书签失败');
+    }
 }
 
 /**
