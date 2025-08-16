@@ -1,0 +1,32 @@
+/* Responsive design styles */
+
+@media(max-width:900px){ 
+  .container { 
+    padding-top: 15px; 
+  } 
+  
+  .sidebar{ 
+    position: fixed; 
+    left: 0; 
+    top: 0; 
+    height: 100%; 
+    z-index: 1100; 
+    margin-left: -320px; 
+  } 
+  
+  .sidebar.visible { 
+    margin-left: 0; 
+  } 
+  
+  .main { 
+    padding: 0 15px; 
+  } 
+  
+  .reader{ 
+    min-height: 98%; 
+  } 
+  
+  .right-toolbar { 
+    right: 10px; 
+  } 
+}

@@ -1,0 +1,89 @@
+/* Base styles, CSS variables, and reset */
+:root{ 
+  --bg: #FAF7ED;
+  --page-bg: #EBEBEB;
+  --text: #3D3D3D;
+  --accent: #DB2828;
+  --muted: #888888;
+  --border-color: #E0E0E0;
+  --hover-bg: #F0F0F0;
+  --shadow-color: rgba(0,0,0,0.08);
+  --toolbar-bg: #FFFFFF;
+}
+
+[data-theme="dark"]{ 
+  --bg: #121212;
+  --page-bg: #0A0A0A;
+  --text: #BDBDBD;
+  --accent: #D4AF37;
+  --muted: #757575;
+  --border-color: #2C2C2C;
+  --hover-bg: #252525;
+  --shadow-color: rgba(0,0,0,0.4);
+  --toolbar-bg: #1E1E1E;
+}
+
+*{
+  box-sizing: border-box;
+}
+
+body, .sidebar, .reader, .right-toolbar, .book-item, .chapter-item, button {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+body{
+  margin:0;
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  overflow: hidden;
+}
+
+.container{
+  display:flex;
+  height: 100vh;
+  padding-top: 30px;
+}
+
+.main{
+  flex:1;
+  display:flex;
+  justify-content: center;
+  padding: 0 30px;
+  overflow: auto;
+}
+
+.reader{
+  max-width: 800px;
+  width:100%;
+  background: var(--bg);
+  padding: 30px 40px;
+  border-radius: 4px;
+  box-shadow:0 2px 10px var(--shadow-color);
+  height: fit-content;
+  min-height: 95%;
+  font-size: 18px; 
+}
+
+.reader h1{
+  font-size:1.33em; 
+  font-weight: 600; 
+  margin:6px 0 24px; 
+  text-align: center;
+}
+
+.reader p{
+  font-size:1em;
+  line-height:2;
+  text-indent:2em
+}
+
+.epub-container{
+  width:100%; 
+  min-height:300px
+}
+
+.muted{
+  color:var(--muted);
+  font-size:13px
+}
