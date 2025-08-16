@@ -383,8 +383,15 @@ async function openBookFromServer(book) {
         const fileData = await response.arrayBuffer();
         state.currentFileKey = getFileKey(book.path);
         
-        // 保存最后阅读的书籍信息
-        saveLastReadBook(book);
+        // 检查是否是最近阅读的书籍，如果是则清除标识
+        const wasLastRead = state.lastReadBook && book.path === state.lastReadBook.path;
+        if (wasLastRead) {
+            // 清除最近阅读标识
+            state.lastReadBook = null;
+            localStorage.removeItem('lastReadBook');
+            // 重新渲染书架以移除"最近阅读"标识
+            renderBookshelf();
+        }
         
         // 加载书签
         loadBookmarks();
@@ -399,6 +406,12 @@ async function openBookFromServer(book) {
             const text = await readArrayBufferWithEncoding(fileData);
             await openTxt(text, book.name);
         }
+        
+        // 关闭侧边栏（如果当前显示的是书架）
+        if (state.sidebarView === 'bookshelf' && sidebar.classList.contains('visible')) {
+            sidebar.classList.remove('visible');
+        }
+        
     } catch (error) {
         console.error('Error opening book from server:', error);
         alert(`打开书籍 "${book.name}" 失败: ${error.message}`);
@@ -942,7 +955,7 @@ function clearAllBookmarks() {
 }
 
 /**
- * 新增：最后阅读书籍管理函数
+ * 修改：最后阅读书籍管理函数
  */
 function saveLastReadBook(book) {
     try {
@@ -976,6 +989,17 @@ function loadLastReadBook() {
         state.lastReadBook = null;
     }
 }
+
+// 新增：当用户离开页面时保存当前阅读的书籍为最近阅读
+window.addEventListener('beforeunload', () => {
+    if (state.currentFileKey && state.bookshelf.length > 0) {
+        // 找到当前正在阅读的书籍
+        const currentBook = state.bookshelf.find(book => getFileKey(book.path) === state.currentFileKey);
+        if (currentBook) {
+            saveLastReadBook(currentBook);
+        }
+    }
+});
 </script>
 </body>
 </html>
