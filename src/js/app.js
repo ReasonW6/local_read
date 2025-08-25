@@ -316,6 +316,42 @@ function updateSettingsStatus() {
   }
 }
 
+// 设置导航切换功能
+function initSettingsNavigation() {
+  const navItems = document.querySelectorAll('.settings-nav-item');
+  const categories = document.querySelectorAll('.settings-category');
+  
+  function switchCategory(targetCategory) {
+    // 更新导航项状态
+    navItems.forEach(item => {
+      item.classList.toggle('active', item.dataset.category === targetCategory);
+    });
+    
+    // 更新分类显示状态
+    categories.forEach(category => {
+      const categoryId = `category-${targetCategory}`;
+      if (category.id === categoryId) {
+        category.style.display = 'block';
+        category.classList.add('active');
+      } else {
+        category.style.display = 'none';
+        category.classList.remove('active');
+      }
+    });
+  }
+  
+  // 绑定导航点击事件
+  navItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const category = item.dataset.category;
+      switchCategory(category);
+    });
+  });
+  
+  // 默认显示第一个分类
+  switchCategory('reading');
+}
+
 function initSettingsPanel() {
   const settingsBtn = document.getElementById('settingsBtn');
   const mask = document.getElementById('settingsMask');
@@ -326,6 +362,9 @@ function initSettingsPanel() {
   const paraVal = document.getElementById('paraSpacingVal');
   const letterVal = document.getElementById('letterSpacingVal');
   const resetBtn = document.getElementById('resetReadingPrefsBtn');
+
+  // 初始化导航功能
+  initSettingsNavigation();
 
   const prefs = getReadingPrefs();
   if (paraInput) paraInput.value = String(prefs.paraSpacing);

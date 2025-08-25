@@ -114,9 +114,35 @@
         <button id="settingsClose" class="settings-close">×</button>
       </div>
       
+      <!-- Settings Navigation -->
+      <div class="settings-nav">
+        <button class="settings-nav-item active" data-category="reading">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          <span>阅读体验</span>
+        </button>
+        <button class="settings-nav-item" data-category="shortcuts">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          <span>快捷键</span>
+        </button>
+        <button class="settings-nav-item" data-category="advanced">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 5 15.4a1.65 1.65 0 0 0-1.51-1H3.4a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 5 8.49a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8.49 5c.26 0 .51-.05.74-.15A1.65 1.65 0 0 0 10.74 3.4V3.31a2 2 0 1 1 4 0v.09c0 .65.38 1.24.97 1.51.23.1.48.15.74.15.65 0 1.24-.38 1.51-.97l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.47.47-.6 1.18-.33 1.82.1.23.15.48.15.74 0 .65.38 1.24.97 1.51.23.1.48.15.74.15h.09a2 2 0 1 1 0 4h-.09c-.65 0-1.24.38-1.51.97Z"></path>
+          </svg>
+          <span>高级功能</span>
+        </button>
+      </div>
+      
       <div class="settings-content">
         <!-- 阅读体验设置 -->
-        <div class="settings-category">
+        <div class="settings-category" id="category-reading">
           <div class="settings-category-header">
             <svg class="settings-category-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
@@ -172,7 +198,7 @@
         </div>
         
         <!-- 操作指南 -->
-        <div class="settings-category">
+        <div class="settings-category" id="category-shortcuts" style="display: none;">
           <div class="settings-category-header">
             <svg class="settings-category-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
@@ -238,7 +264,7 @@
         </div>
         
         <!-- 功能预览 -->
-        <div class="settings-category">
+        <div class="settings-category" id="category-advanced" style="display: none;">
           <div class="settings-category-header">
             <svg class="settings-category-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="3"></circle>

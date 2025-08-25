@@ -381,6 +381,47 @@
   color: var(--text-color);
 }
 
+/* Settings navigation */
+.settings-nav {
+  display: flex;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0;
+  overflow-x: auto;
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  flex-shrink: 0;
+}
+
+.settings-nav-item:hover {
+  background: var(--hover-bg);
+  color: var(--text-color);
+}
+
+.settings-nav-item.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--bg);
+}
+
+.settings-nav-item svg {
+  flex-shrink: 0;
+}
+
 .settings-content {
   flex: 1;
   overflow-y: auto;
@@ -503,10 +544,16 @@
 
 /* Settings category styles */
 .settings-category {
-  border-bottom: 1px solid var(--border-color);
+  display: none;
+  animation: fadeIn 0.3s ease;
 }
-.settings-category:last-child {
-  border-bottom: none;
+.settings-category.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .settings-category-header {
@@ -632,5 +679,15 @@
   }
   .shortcut-grid {
     grid-template-columns: 1fr;
+  }
+  .settings-nav {
+    padding: 0 8px;
+  }
+  .settings-nav-item {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+  .settings-nav-item span {
+    display: none;
   }
 }
