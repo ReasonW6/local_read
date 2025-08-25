@@ -302,7 +302,7 @@ function initKeyboardShortcuts() {
   window.addEventListener('keydown', onKeydown);
 }
 
-// 更新设置面板中的状态显示
+/* 更新设置面板中的状态显示 */
 function updateSettingsStatus() {
   const currentFontSize = document.getElementById('currentFontSize');
   const currentTheme = document.getElementById('currentTheme');
@@ -314,6 +314,18 @@ function updateSettingsStatus() {
   if (currentTheme) {
     currentTheme.textContent = state.theme === 'light' ? '日间模式' : '夜间模式';
   }
+}
+
+/* 顶部进度条显示/隐藏应用 */
+function applyProgressBarPreference(enabled) {
+  // 支持多种可能的结构/选择器，尽量兼容现有实现
+  const containers = Array.from(document.querySelectorAll('#readingProgress, .reading-progress, .top-progress'));
+  const bars = Array.from(document.querySelectorAll('#readingProgressBar, .reading-progress__bar, .progress-bar'));
+  if (containers.length === 0 && bars.length === 0) return;
+
+  const display = enabled ? '' : 'none';
+  containers.forEach(el => { el.style.display = display; });
+  bars.forEach(el => { el.style.display = display; });
 }
 
 // 设置导航切换功能
@@ -374,6 +386,22 @@ function initSettingsPanel() {
 
   applyTypography(prefs);
   updateSettingsStatus();
+
+  // 顶部进度条开关初始化与监听（默认开启）
+  const progressToggle = document.getElementById('progressBarToggle');
+  const progressEnabled = prefs.progressBarEnabled !== false;
+  if (progressToggle) {
+    progressToggle.checked = progressEnabled;
+    applyProgressBarPreference(progressEnabled);
+    progressToggle.addEventListener('change', () => {
+      const next = { ...getReadingPrefs(), progressBarEnabled: progressToggle.checked };
+      saveReadingPrefs(next);
+      applyProgressBarPreference(progressToggle.checked);
+      if (typeof saveCompleteReadingState === 'function') {
+        saveCompleteReadingState();
+      }
+    });
+  }
 
   function openSettings() {
     if (mask) mask.classList.add('show');
