@@ -3,49 +3,17 @@ import { state, updateState, setNavigating } from '../core/state.js';
 import { DOM } from '../core/config.js';
 import { loadProgress, saveProgress } from './fileManager.js';
 import { clearReader, renderTOC, updateActiveTOC, renderChapterNav } from './uiController.js';
+import { registerAndApplyEpubTheme, applyEpubFontSize } from './epubCore.js';
 
-// Register EPUB themes
+// Register EPUB themes (使用增强版本)
 export function registerEpubThemes() {
   if (!state.rendition) return;
-  const commonStyles = { 
-    "line-height": "2", 
-    "font-family": '"Microsoft YaHei", sans-serif', 
-    "padding": "0 !important", 
-    "margin": "0 !important" 
-  };
-  
-  state.rendition.themes.register("light", { 
-    "body": { 
-      ...commonStyles, 
-      "color": "#3D3D3D !important", 
-      "background-color": "#FAF7ED !important" 
-    },
-    "p": { "color": "#3D3D3D !important" },
-    "h1, h2, h3, h4, h5, h6": { "color": "#3D3D3D !important" },
-    "div": { "color": "#3D3D3D !important" } 
-  });
-  
-  state.rendition.themes.register("dark", { 
-    "body": { 
-      ...commonStyles, 
-      "color": "#BDBDBD !important", 
-      "background-color": "#121212 !important" 
-    }, 
-    "p": { "color": "#BDBDBD !important" }, 
-    "h1, h2, h3, h4, h5, h6": { "color": "#BDBDBD !important" }, 
-    "div": { "color": "#BDBDBD !important" } 
-  });
+  registerAndApplyEpubTheme(state.theme);
 }
 
-// Apply font size to EPUB
+// Apply font size to EPUB (使用增强版本)
 export function applyFontSize() {
-  const reader = DOM.reader();
-  if (reader) {
-    reader.style.fontSize = state.fontSize + 'px';
-  }
-  if (state.rendition) {
-    state.rendition.themes.fontSize(state.fontSize + 'px');
-  }
+  applyEpubFontSize(state.fontSize);
 }
 
 // Open EPUB file

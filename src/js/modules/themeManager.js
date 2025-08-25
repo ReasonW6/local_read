@@ -23,7 +23,10 @@ export function toggleTheme() {
   
   // Apply theme to EPUB if applicable
   if (state.rendition && state.type === 'epub') {
-    state.rendition.themes.select(newTheme);
+    // 使用增强的主题应用功能
+    import('./epubCore.js').then(({ registerAndApplyEpubTheme }) => {
+      registerAndApplyEpubTheme(newTheme);
+    });
   }
 }
 
