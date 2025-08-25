@@ -4,3 +4,5 @@ package-lock.json
 package.json
 books/*
 !books/.gitkeep
+.cache/
+.codebuddy/
