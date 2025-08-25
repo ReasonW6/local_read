@@ -17,7 +17,7 @@ import {
   clearAllBookmarks, 
   loadBookmarks 
 } from './modules/bookmarkManager.js';
-import { toggleSidebar, closeSidebarIfBookshelf, goToNextChapter, goToPreviousChapter } from './modules/uiController.js';
+import { toggleSidebar, closeSidebarIfBookshelf, closeSidebar, goToNextChapter, goToPreviousChapter } from './modules/uiController.js';
 
 /* ========== 设置面板与阅读偏好 ========== */
 const PREFS_KEY = 'reader_prefs_v1';
@@ -302,10 +302,25 @@ function initKeyboardShortcuts() {
   window.addEventListener('keydown', onKeydown);
 }
 
+// 更新设置面板中的状态显示
+function updateSettingsStatus() {
+  const currentFontSize = document.getElementById('currentFontSize');
+  const currentTheme = document.getElementById('currentTheme');
+  
+  if (currentFontSize) {
+    currentFontSize.textContent = `${state.fontSize}px`;
+  }
+  
+  if (currentTheme) {
+    currentTheme.textContent = state.theme === 'light' ? '日间模式' : '夜间模式';
+  }
+}
+
 function initSettingsPanel() {
   const settingsBtn = document.getElementById('settingsBtn');
   const mask = document.getElementById('settingsMask');
-  const drawer = document.getElementById('settingsDrawer');
+  const modal = document.getElementById('settingsModal');
+  const closeBtn = document.getElementById('settingsClose');
   const paraInput = document.getElementById('paraSpacingInput');
   const letterInput = document.getElementById('letterSpacingInput');
   const paraVal = document.getElementById('paraSpacingVal');
@@ -319,26 +334,32 @@ function initSettingsPanel() {
   if (letterVal) letterVal.textContent = `${prefs.letterSpacing}px`;
 
   applyTypography(prefs);
+  updateSettingsStatus();
 
   function openSettings() {
     if (mask) mask.classList.add('show');
-    if (drawer) {
-      drawer.classList.add('open');
-      drawer.setAttribute('aria-hidden', 'false');
-    }
+    // 打开时更新状态显示
+    updateSettingsStatus();
   }
   function closeSettings() {
     if (mask) mask.classList.remove('show');
-    if (drawer) {
-      drawer.classList.remove('open');
-      drawer.setAttribute('aria-hidden', 'true');
-    }
   }
 
   if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
-  if (mask) mask.addEventListener('click', closeSettings);
+  if (closeBtn) closeBtn.addEventListener('click', closeSettings);
+  
+  // 点击遮罩关闭（但不包括模态窗口本身）
+  if (mask) {
+    mask.addEventListener('click', (e) => {
+      if (e.target === mask) {
+        closeSettings();
+      }
+    });
+  }
+  
+  // ESC 键关闭
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && drawer && drawer.classList.contains('open')) {
+    if (e.key === 'Escape' && mask && mask.classList.contains('show')) {
       closeSettings();
     }
   });
@@ -374,8 +395,64 @@ function initSettingsPanel() {
       applyTypography(next);
       // 重置后也保存完整状态
       saveCompleteReadingState();
+      // 更新状态显示
+      updateSettingsStatus();
     });
   }
+}
+
+// 暴露函数到全局，供 HTML 中的 onclick 使用
+window.changeFontSize = (delta) => {
+  changeFontSize(delta);
+  saveCompleteReadingState();
+  updateSettingsStatus();
+  requestAnimationFrame(updateReadingProgress);
+};
+
+window.toggleTheme = () => {
+  toggleTheme();
+  saveCompleteReadingState();
+  updateSettingsStatus();
+  requestAnimationFrame(() => applyTypography(getReadingPrefs()));
+  requestAnimationFrame(updateReadingProgress);
+};
+
+// 初始化侧边栏自动收起功能
+function initSidebarAutoClose() {
+  const mainContent = document.querySelector('.main');
+  const sidebar = document.getElementById('sidebar');
+  
+  if (!mainContent || !sidebar) return;
+  
+  // 点击主内容区域时，如果侧边栏是打开的，则关闭它
+  mainContent.addEventListener('click', (e) => {
+    // 检查侧边栏是否可见
+    if (sidebar.classList.contains('visible')) {
+      // 确保点击的不是功能按钮或交互元素
+      const clickedElement = e.target;
+      const isInteractiveElement = clickedElement.closest('button, a, input, select, textarea, [contenteditable]');
+      
+      // 如果不是交互元素，则关闭侧边栏
+      if (!isInteractiveElement) {
+        closeSidebar();
+      }
+    }
+  });
+  
+  // 也可以通过点击侧边栏外的其他区域关闭（但不包括右侧工具栏）
+  document.addEventListener('click', (e) => {
+    if (!sidebar.classList.contains('visible')) return;
+    
+    const clickedElement = e.target;
+    const isInSidebar = clickedElement.closest('.sidebar');
+    const isInToolbar = clickedElement.closest('.right-toolbar');
+    const isInteractiveElement = clickedElement.closest('button, a, input, select, textarea, [contenteditable]');
+    
+    // 如果点击的不在侧边栏内，不在工具栏内，且不是交互元素，则关闭侧边栏
+    if (!isInSidebar && !isInToolbar && !isInteractiveElement) {
+      closeSidebar();
+    }
+  });
 }
 
 // Setup event listeners
@@ -386,6 +463,7 @@ function setupEventListeners() {
     initReadingProgress();
     initKeyboardShortcuts();
     initSettingsPanel();
+    initSidebarAutoClose();
     applyTypography(getReadingPrefs());
 
     loadBookshelf().then(() => {

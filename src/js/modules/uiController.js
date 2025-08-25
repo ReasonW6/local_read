@@ -141,3 +141,11 @@ export function closeSidebarIfBookshelf() {
     sidebar.classList.remove('visible');
   }
 }
+
+// Close sidebar (general function)
+export function closeSidebar() {
+  const sidebar = DOM.sidebar();
+  if (sidebar && sidebar.classList.contains('visible')) {
+    sidebar.classList.remove('visible');
+  }
+}
