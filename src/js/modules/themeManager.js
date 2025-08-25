@@ -45,6 +45,47 @@ export function changeFontSize(delta) {
   }
 }
 
+// Set font size directly (for loading saved state)
+export function setFontSize(fontSize) {
+  if (fontSize < CONFIG.MIN_FONT_SIZE || fontSize > CONFIG.MAX_FONT_SIZE) return;
+  
+  updateState({ fontSize });
+  
+  // Apply font size based on current book type
+  if (state.type === 'epub') {
+    applyFontSize();
+  } else if (state.type === 'txt') {
+    applyTxtFontSize();
+  }
+}
+
+// Set theme directly (for loading saved state)
+export function setTheme(theme) {
+  if (theme !== CONFIG.THEMES.LIGHT && theme !== CONFIG.THEMES.DARK) return;
+  
+  updateState({ theme });
+  
+  // Update body theme attribute
+  document.body.dataset.theme = theme;
+  
+  // Update theme toggle button text
+  const themeToggle = DOM.themeToggle();
+  if (themeToggle) {
+    const themeLabel = themeToggle.querySelector('span');
+    if (themeLabel) {
+      themeLabel.textContent = theme === CONFIG.THEMES.LIGHT ? '夜间' : '日间';
+    }
+  }
+  
+  // Apply theme to EPUB if applicable
+  if (state.rendition && state.type === 'epub') {
+    // 使用增强的主题应用功能
+    import('./epubCore.js').then(({ registerAndApplyEpubTheme }) => {
+      registerAndApplyEpubTheme(theme);
+    });
+  }
+}
+
 // Initialize theme on page load
 export function initializeTheme() {
   // Set initial theme

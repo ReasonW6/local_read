@@ -19,13 +19,158 @@ import {
 } from './modules/bookmarkManager.js';
 import { toggleSidebar, closeSidebarIfBookshelf, goToNextChapter, goToPreviousChapter } from './modules/uiController.js';
 
-// Manual save progress function
+/* ========== 设置面板与阅读偏好 ========== */
+const PREFS_KEY = 'reader_prefs_v1';
+const defaultPrefs = { paraSpacing: 1, letterSpacing: 0.2 };
+
+function getReadingPrefs() {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return { ...defaultPrefs };
+    const parsed = JSON.parse(raw);
+    return { ...defaultPrefs, ...parsed };
+  } catch {
+    return { ...defaultPrefs };
+  }
+}
+
+function saveReadingPrefs(prefs) {
+  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+}
+
+function applyTypography(prefs) {
+  document.documentElement.style.setProperty('--para-spacing', String(prefs.paraSpacing));
+  document.documentElement.style.setProperty('--letter-spacing', `${prefs.letterSpacing}px`);
+  applyEpubTypographyToContents(prefs);
+  requestAnimationFrame(updateReadingProgress);
+}
+
+function applyEpubTypographyToContents(prefs) {
+  if (!state.rendition) return;
+  const contents = state.rendition.getContents();
+  contents.forEach(content => {
+    try {
+      const doc = content?.document;
+      if (!doc) return;
+      const id = 'epub-typography-override';
+      let style = doc.getElementById(id);
+      if (!style) {
+        style = doc.createElement('style');
+        style.id = id;
+        doc.head.appendChild(style);
+      }
+      style.textContent = `
+        p { 
+          letter-spacing: ${prefs.letterSpacing}px !important; 
+          margin-bottom: calc(${prefs.paraSpacing} * 1em) !important; 
+        }
+      `;
+    } catch {}
+  });
+  if (!state.rendition._typographyHooked) {
+    try {
+      state.rendition.on('rendered', () => {
+        applyEpubTypographyToContents(getReadingPrefs());
+      });
+      state.rendition._typographyHooked = true;
+    } catch {}
+  }
+}
+
+// Save complete reading state (progress + settings)
+function saveCompleteReadingState() {
+  if (!state.currentFileKey) return;
+  
+  const currentPrefs = getReadingPrefs();
+  const completeState = {
+    fontSize: state.fontSize,
+    theme: state.theme,
+    paraSpacing: currentPrefs.paraSpacing,
+    letterSpacing: currentPrefs.letterSpacing,
+    timestamp: Date.now()
+  };
+  
+  const stateKey = `reader_complete_state_${state.currentFileKey}`;
+  localStorage.setItem(stateKey, JSON.stringify(completeState));
+}
+
+// Load and apply complete reading state
+function loadCompleteReadingState() {
+  if (!state.currentFileKey) return;
+  
+  const stateKey = `reader_complete_state_${state.currentFileKey}`;
+  try {
+    const raw = localStorage.getItem(stateKey);
+    if (!raw) return;
+    
+    const savedState = JSON.parse(raw);
+    
+    // 应用字体大小（如果与当前不同）
+    if (savedState.fontSize && savedState.fontSize !== state.fontSize) {
+      // 直接更新状态，避免触发额外的保存
+      import('./modules/themeManager.js').then(({ setFontSize }) => {
+        if (setFontSize) {
+          setFontSize(savedState.fontSize);
+        } else {
+          // 备用方案：直接设置
+          state.fontSize = savedState.fontSize;
+          const reader = DOM.reader();
+          if (reader) reader.style.fontSize = savedState.fontSize + 'px';
+        }
+      });
+    }
+    
+    // 应用主题（如果与当前不同）
+    if (savedState.theme && savedState.theme !== state.theme) {
+      import('./modules/themeManager.js').then(({ setTheme }) => {
+        if (setTheme) {
+          setTheme(savedState.theme);
+        }
+      });
+    }
+    
+    // 应用排版设置
+    if (savedState.paraSpacing !== undefined || savedState.letterSpacing !== undefined) {
+      const newPrefs = {
+        paraSpacing: savedState.paraSpacing || defaultPrefs.paraSpacing,
+        letterSpacing: savedState.letterSpacing || defaultPrefs.letterSpacing
+      };
+      saveReadingPrefs(newPrefs);
+      applyTypography(newPrefs);
+      
+      // 更新设置面板UI
+      updateSettingsPanelUI(newPrefs);
+    }
+    
+  } catch (error) {
+    console.warn('Failed to load complete reading state:', error);
+  }
+}
+
+// Update settings panel UI with loaded values
+function updateSettingsPanelUI(prefs) {
+  const paraInput = document.getElementById('paraSpacingInput');
+  const letterInput = document.getElementById('letterSpacingInput');
+  const paraVal = document.getElementById('paraSpacingVal');
+  const letterVal = document.getElementById('letterSpacingVal');
+  
+  if (paraInput) paraInput.value = String(prefs.paraSpacing);
+  if (letterInput) letterInput.value = String(prefs.letterSpacing);
+  if (paraVal) paraVal.textContent = `${prefs.paraSpacing}`;
+  if (letterVal) letterVal.textContent = `${prefs.letterSpacing}px`;
+}
+
+// Enhanced save function - saves progress + settings
 function manualSaveProgress() {
+  // 保存阅读进度
   if (state.type === 'epub') {
     manualSaveEpubProgress();
   } else if (state.type === 'txt') {
     manualSaveTxtProgress();
   }
+  
+  // 保存完整的阅读设置
+  saveCompleteReadingState();
   showSavedIndicator();
 }
 
@@ -45,8 +190,11 @@ async function openBook(book, fileData) {
     
     // 关闭侧边栏（如果当前显示的是书架）
     closeSidebarIfBookshelf();
-    // 应用当前阅读排版偏好（EPUB 将注入样式，TXT 走 CSS 变量）
-    requestAnimationFrame(() => applyTypography(getReadingPrefs()));
+    
+    // 延迟加载完整的阅读状态（包括字体、主题、排版等）
+    setTimeout(() => {
+      loadCompleteReadingState();
+    }, 300);
     
   } catch (error) {
     console.error('Error opening book:', error);
@@ -114,18 +262,21 @@ function initKeyboardShortcuts() {
       case '+':
       case '=':
         changeFontSize(1);
+        saveCompleteReadingState();
         requestAnimationFrame(updateReadingProgress);
         e.preventDefault();
         break;
       case '-':
       case '_':
         changeFontSize(-1);
+        saveCompleteReadingState();
         requestAnimationFrame(updateReadingProgress);
         e.preventDefault();
         break;
       case 't':
       case 'T':
         toggleTheme();
+        saveCompleteReadingState();
         requestAnimationFrame(() => applyTypography(getReadingPrefs()));
         requestAnimationFrame(updateReadingProgress);
         e.preventDefault();
@@ -149,64 +300,6 @@ function initKeyboardShortcuts() {
     }
   }
   window.addEventListener('keydown', onKeydown);
-}
-
-/* ========== 设置面板与阅读偏好 ========== */
-const PREFS_KEY = 'reader_prefs_v1';
-const defaultPrefs = { paraSpacing: 1, letterSpacing: 0.2 };
-
-function getReadingPrefs() {
-  try {
-    const raw = localStorage.getItem(PREFS_KEY);
-    if (!raw) return { ...defaultPrefs };
-    const parsed = JSON.parse(raw);
-    return { ...defaultPrefs, ...parsed };
-  } catch {
-    return { ...defaultPrefs };
-  }
-}
-
-function saveReadingPrefs(prefs) {
-  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-}
-
-function applyTypography(prefs) {
-  document.documentElement.style.setProperty('--para-spacing', String(prefs.paraSpacing));
-  document.documentElement.style.setProperty('--letter-spacing', `${prefs.letterSpacing}px`);
-  applyEpubTypographyToContents(prefs);
-  requestAnimationFrame(updateReadingProgress);
-}
-
-function applyEpubTypographyToContents(prefs) {
-  if (!state.rendition) return;
-  const contents = state.rendition.getContents();
-  contents.forEach(content => {
-    try {
-      const doc = content?.document;
-      if (!doc) return;
-      const id = 'epub-typography-override';
-      let style = doc.getElementById(id);
-      if (!style) {
-        style = doc.createElement('style');
-        style.id = id;
-        doc.head.appendChild(style);
-      }
-      style.textContent = `
-        p { 
-          letter-spacing: ${prefs.letterSpacing}px !important; 
-          margin-bottom: calc(${prefs.paraSpacing} * 1em) !important; 
-        }
-      `;
-    } catch {}
-  });
-  if (!state.rendition._typographyHooked) {
-    try {
-      state.rendition.on('rendered', () => {
-        applyEpubTypographyToContents(getReadingPrefs());
-      });
-      state.rendition._typographyHooked = true;
-    } catch {}
-  }
 }
 
 function initSettingsPanel() {
@@ -257,6 +350,7 @@ function initSettingsPanel() {
       if (paraVal) paraVal.textContent = `${next.paraSpacing}`;
       saveReadingPrefs(next);
       applyTypography(next);
+      saveCompleteReadingState();
     });
   }
   if (letterInput) {
@@ -266,6 +360,7 @@ function initSettingsPanel() {
       if (letterVal) letterVal.textContent = `${next.letterSpacing}px`;
       saveReadingPrefs(next);
       applyTypography(next);
+      saveCompleteReadingState();
     });
   }
   if (resetBtn) {
@@ -277,10 +372,11 @@ function initSettingsPanel() {
       if (letterVal) letterVal.textContent = `${next.letterSpacing}px`;
       saveReadingPrefs(next);
       applyTypography(next);
+      // 重置后也保存完整状态
+      saveCompleteReadingState();
     });
   }
 }
-
 
 // Setup event listeners
 function setupEventListeners() {
@@ -333,6 +429,7 @@ function setupEventListeners() {
   if (themeToggle) {
     themeToggle.addEventListener('click', () => { 
       toggleTheme(); 
+      saveCompleteReadingState();
       requestAnimationFrame(() => applyTypography(getReadingPrefs()));
       requestAnimationFrame(updateReadingProgress); 
     });
@@ -340,12 +437,14 @@ function setupEventListeners() {
   if (fontIncreaseBtn) {
     fontIncreaseBtn.addEventListener('click', () => { 
       changeFontSize(1); 
+      saveCompleteReadingState();
       requestAnimationFrame(updateReadingProgress); 
     });
   }
   if (fontDecreaseBtn) {
     fontDecreaseBtn.addEventListener('click', () => { 
       changeFontSize(-1); 
+      saveCompleteReadingState();
       requestAnimationFrame(updateReadingProgress); 
     });
   }
@@ -373,6 +472,8 @@ function setupEventListeners() {
       if (currentBook) {
         saveLastReadBook(currentBook);
       }
+      // 自动保存完整的阅读状态
+      saveCompleteReadingState();
     }
   });
 }
