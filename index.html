@@ -15,6 +15,8 @@
   <script src="https://unpkg.com/epubjs/dist/epub.min.js"></script>
 </head>
 <body data-theme="light">
+  <div class="reading-progress"><div class="reading-progress__bar" id="readingProgressBar"></div></div>
+  <div class="reading-progress__text" id="readingProgressText">0%</div>
 
   <div class="right-toolbar">
     <button id="tocToggleBtn" title="目录">
@@ -50,6 +52,14 @@
     <button id="saveProgressBtn" title="手动保存进度">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
       <span>保存</span>
+    </button>
+    <div class="toolbar-divider"></div>
+    <button id="settingsBtn" title="设置">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 5 15.4a1.65 1.65 0 0 0-1.51-1H3.4a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 5 8.49a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8.49 5c.26 0 .51-.05.74-.15A1.65 1.65 0 0 0 10.74 3.4V3.31a2 2 0 1 1 4 0v.09c0 .65.38 1.24.97 1.51.23.1.48.15.74.15.65 0 1.24-.38 1.51-.97l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.47.47-.6 1.18-.33 1.82.1.23.15.48.15.74 0 .65.38 1.24.97 1.51.23.1.48.15.74.15h.09a2 2 0 1 1 0 4h-.09c-.65 0-1.24.38-1.51.97Z"></path>
+      </svg>
+      <span>设置</span>
     </button>
   </div>
 
@@ -95,6 +105,40 @@
       </div>
     </main>
   </div>
+
+  <div id="settingsMask" class="settings-mask"></div>
+  <aside id="settingsDrawer" class="settings-drawer" aria-hidden="true">
+    <div class="settings-header">阅读设置</div>
+    <div class="settings-section">
+      <div class="section-title">阅读偏好</div>
+      <label style="display:block;margin:8px 0;">
+        <span>段落间距</span>
+        <input type="range" id="paraSpacingInput" min="0.6" max="2" step="0.05" />
+        <span id="paraSpacingVal" class="setting-value"></span>
+      </label>
+      <label style="display:block;margin:8px 0;">
+        <span>字间距</span>
+        <input type="range" id="letterSpacingInput" min="0" max="1.5" step="0.05" />
+        <span id="letterSpacingVal" class="setting-value"></span>
+      </label>
+      <button id="resetReadingPrefsBtn" class="settings-reset">恢复默认</button>
+    </div>
+    <div class="settings-section">
+      <div class="section-title">键盘快捷键</div>
+      <ul class="shortcut-list">
+        <li>← / →：上一章 / 下一章</li>
+        <li>+ / -：增大 / 减小字体</li>
+        <li>T：切换主题</li>
+        <li>B：添加书签</li>
+        <li>S：保存进度</li>
+        <li>空格：下一章</li>
+      </ul>
+    </div>
+    <div class="settings-section">
+      <div class="section-title">更多功能（预留）</div>
+      <div class="muted">将加入：行距、对齐方式、页边距、主题自定义、注释标注等。</div>
+    </div>
+  </aside>
 
   <!-- Main Application Script -->
   <script type="module" src="src/js/app.js"></script>

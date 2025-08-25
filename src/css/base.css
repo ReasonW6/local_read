@@ -9,6 +9,8 @@
   --hover-bg: #F0F0F0;
   --shadow-color: rgba(0,0,0,0.08);
   --toolbar-bg: #FFFFFF;
+  --para-spacing: 1;
+  --letter-spacing: 0.2px;
 }
 
 [data-theme="dark"]{ 
@@ -51,6 +53,8 @@ body{
   justify-content: center;
   padding: 0 30px;
   overflow: auto;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
 }
 
 .reader{
@@ -74,7 +78,9 @@ body{
 
 .reader p{
   font-size:1em;
-  line-height:2;
+  line-height:1.8;
+  letter-spacing: var(--letter-spacing, 0.2px);
+  margin: 0 0 calc(var(--para-spacing, 1) * 1em);
   text-indent:2em
 }
 
