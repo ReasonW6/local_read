@@ -18,7 +18,7 @@ const findBooks = (dir, fileList = [], parentDir = '') => {
 
     if (fileStat.isDirectory()) {
       findBooks(filePath, fileList, relativePath);
-    } else if (file.toLowerCase().endsWith('.epub') || file.toLowerCase().endsWith('.txt')) {
+    } else if (file.toLowerCase().endsWith('.epub') || file.toLowerCase().endsWith('.txt') || file.toLowerCase().endsWith('.pdf')) {
       fileList.push({
         name: file,
         path: relativePath, // 使用相对路径作为唯一标识
@@ -68,5 +68,5 @@ app.use(express.static(path.join(__dirname)));
 
 app.listen(port, () => {
   console.log(`E-book reader server listening at http://localhost:${port}`);
-  console.log(`Place your .epub and .txt files in the "${booksDirectory}" folder.`);
+  console.log(`Place your .epub, .txt and .pdf files in the "${booksDirectory}" folder.`);
 });

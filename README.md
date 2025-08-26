@@ -53,7 +53,7 @@
     ```
 3. **添加电子书**
 
-   将你的 `.epub` 或 `.txt` 文件复制到 `books/` 文件夹中。
+   将你的 `.epub`、`.txt` 或 `.pdf` 文件复制到 `books/` 文件夹中。
 
 4. **启动服务器**
 
@@ -84,7 +84,7 @@
 
 ```
 local_read/
-├── books/                # 📚 存放电子书文件 (.epub, .txt)
+├── books/                # 📚 存放电子书文件 (.epub, .txt, .pdf)
 │   └── .gitkeep          # Git占位符文件
 ├── src/                  # 💻 前端与辅助源码
 ├── node_modules/         # 📦 项目依赖 (npm自动生成)
