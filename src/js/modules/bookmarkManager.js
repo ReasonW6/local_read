@@ -20,6 +20,12 @@ export function getCurrentReadingLocation() {
       chapterIndex: state.currentIndex,
       chapterTitle: state.chapters[state.currentIndex]?.label || '未知章节'
     };
+  } else if (state.type === 'pdf') {
+    return {
+      type: 'pdf',
+      pageIndex: state.currentIndex,
+      chapterTitle: state.chapters[state.currentIndex]?.label || `第${state.currentIndex + 1}页`
+    };
   }
   return null;
 }
@@ -45,9 +51,14 @@ export function addBookmark() {
     bookmarkTitle = location.chapterTitle;
   }
 
+  let level = parseInt(prompt('选择书签级别：1=一级, 2=二级, 3=三级', '1') || '1', 10);
+  if (isNaN(level) || level < 1) level = 1;
+  if (level > 3) level = 3;
+
   const bookmark = {
     id: Date.now().toString(),
     title: bookmarkTitle.trim(),
+    level: level,
     bookKey: state.currentFileKey,
     bookName: state.book ? (state.book.package ? state.book.package.metadata.title : '当前书籍') : '当前书籍',
     location: location,
@@ -120,9 +131,11 @@ export function renderBookmarkList() {
   
   sortedBookmarks.forEach(bookmark => {
     const el = document.createElement('div');
-    el.className = 'bookmark-item';
+    const lvl = bookmark.level || 1;
+    el.className = 'bookmark-item level-' + lvl;
+    el.style.paddingLeft = ((lvl - 1) * 12) + 'px';
     el.innerHTML = `
-      <div class="bookmark-title">${bookmark.title}</div>
+      <div class="bookmark-title"><span style="display:inline-block;min-width:28px;padding:2px 6px;margin-right:6px;border-radius:10px;font-size:12px;opacity:.7;background:rgba(127,127,127,.15);">Lv${lvl}</span>${bookmark.title}</div>
       <div class="bookmark-location">${bookmark.location.chapterTitle}</div>
       <div class="bookmark-time">${bookmark.createdAt}</div>
       <button class="bookmark-delete" onclick="window.removeBookmark('${bookmark.id}')" title="删除书签">×</button>
@@ -165,6 +178,11 @@ export function goToBookmark(bookmark) {
     // Import here to avoid circular dependency
     import('./txtReader.js').then(({ goToTxtChapter }) => {
       goToTxtChapter(location.chapterIndex);
+    });
+  } else if (location.type === 'pdf' && state.type === 'pdf') {
+    import('./pdfReader.js').then(({ goToPdfChapter }) => {
+      const idx = typeof location.pageIndex === 'number' ? location.pageIndex : 0;
+      goToPdfChapter(idx);
     });
   }
   

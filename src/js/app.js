@@ -11,6 +11,7 @@ import {
 } from './modules/fileManager.js';
 import { openEpub, manualSaveEpubProgress } from './modules/epubReader.js';
 import { openTxt, manualSaveTxtProgress } from './modules/txtReader.js';
+import { openPdf, manualSavePdfProgress } from './modules/pdfReader.js';
 import { toggleTheme, changeFontSize, initializeTheme } from './modules/themeManager.js';
 import { 
   addBookmark, 
@@ -191,6 +192,8 @@ function manualSaveProgress() {
     manualSaveEpubProgress();
   } else if (state.type === 'txt') {
     manualSaveTxtProgress();
+  } else if (state.type === 'pdf') {
+    manualSavePdfProgress();
   }
   
   // 保存完整的阅读设置（包括阅读进度百分比）
@@ -215,6 +218,8 @@ async function openBook(book, fileData) {
     } else if (name.endsWith('.txt')) {
       const text = await readArrayBufferWithEncoding(fileData);
       await openTxt(text, book.name);
+    } else if (name.endsWith('.pdf')) {
+      await openPdf(fileData);
     }
     
     // 关闭侧边栏（如果当前显示的是书架）

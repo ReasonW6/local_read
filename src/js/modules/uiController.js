@@ -64,8 +64,18 @@ export function renderTOC() {
   
   state.chapters.forEach((c, i) => {
     const el = document.createElement('div');
-    el.className = 'chapter-item';
-    el.textContent = c.label;
+    const lvl = Math.max(1, Math.min(3, Number(c.level) || 1));
+    el.className = 'chapter-item level-' + lvl;
+
+    // 样式：一级最大加粗；二级缩进并稍小；三级更小再缩进
+    const fontSize = (lvl === 1 ? '16px' : (lvl === 2 ? '14px' : '13px'));
+    const fontWeight = (lvl === 1 ? '600' : '400');
+    const paddingLeft = (lvl === 1 ? 8 : (lvl === 2 ? 24 : 40)); // 缩进
+    el.style.cssText = `font-size:${fontSize};font-weight:${fontWeight};padding-left:${paddingLeft}px;line-height:1.6;`;
+
+    // 二/三级在标题前增加不可断空格，视觉上更明显
+    const prefix = lvl === 1 ? '' : (lvl === 2 ? '\u00A0\u00A0' : '\u00A0\u00A0\u00A0\u00A0');
+    el.textContent = prefix + (c.label || '');
     el.dataset.index = i;
     toc.appendChild(el);
   });
@@ -121,6 +131,10 @@ export function goToChapter(index) {
   } else if (state.type === 'epub') {
     import('./epubReader.js').then(({ goToEpubChapter }) => {
       goToEpubChapter(index);
+    });
+  } else if (state.type === 'pdf') {
+    import('./pdfReader.js').then(({ goToPdfChapter }) => {
+      goToPdfChapter(index);
     });
   }
 }
