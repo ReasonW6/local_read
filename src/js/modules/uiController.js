@@ -94,18 +94,25 @@ export function updateActiveTOC() {
   const toc = DOM.toc();
   if (!toc) return;
 
-  function getPdfChapterIndexByPage(page) {
-    const chapters = state.chapters || [];
-    if (chapters.length === 0) return 0;
-    let idx = 0;
-    for (let i = 0; i < chapters.length; i++) {
-      const p = typeof chapters[i].pageIndex === 'number' ? chapters[i].pageIndex : null;
-      if (p !== null && p <= page) idx = i;
-    }
-    return idx;
-  }
+  let activeIndex = state.currentIndex;
 
-  const activeIndex = state.type === 'pdf' ? getPdfChapterIndexByPage(state.currentIndex) : state.currentIndex;
+  if (state.type === 'pdf') {
+    // 优先使用 currentChapterIndex，如果没有则根据页面计算
+    if (typeof state.currentChapterIndex === 'number' && state.currentChapterIndex >= 0) {
+      activeIndex = state.currentChapterIndex;
+    } else {
+      // 根据当前页面找到最合适的章节
+      const chapters = state.chapters || [];
+      let bestIndex = 0;
+      for (let i = chapters.length - 1; i >= 0; i--) {
+        if (typeof chapters[i].pageIndex === 'number' && chapters[i].pageIndex <= state.currentIndex) {
+          bestIndex = i;
+          break;
+        }
+      }
+      activeIndex = bestIndex;
+    }
+  }
 
   Array.from(toc.children).forEach((el, idx) => {
     el.classList.toggle('active', idx === activeIndex);
@@ -120,18 +127,25 @@ export function renderChapterNav() {
   const chapterNav = DOM.chapterNav();
   if (!chapterNav) return;
 
-  function getPdfChapterIndexByPage(page) {
-    const chapters = state.chapters || [];
-    if (chapters.length === 0) return 0;
-    let idx = 0;
-    for (let i = 0; i < chapters.length; i++) {
-      const p = typeof chapters[i].pageIndex === 'number' ? chapters[i].pageIndex : null;
-      if (p !== null && p <= page) idx = i;
-    }
-    return idx;
-  }
+  let activeIndex = state.currentIndex;
 
-  const activeIndex = state.type === 'pdf' ? getPdfChapterIndexByPage(state.currentIndex) : state.currentIndex;
+  if (state.type === 'pdf') {
+    // 优先使用 currentChapterIndex，如果没有则根据页面计算
+    if (typeof state.currentChapterIndex === 'number' && state.currentChapterIndex >= 0) {
+      activeIndex = state.currentChapterIndex;
+    } else {
+      // 根据当前页面找到最合适的章节
+      const chapters = state.chapters || [];
+      let bestIndex = 0;
+      for (let i = chapters.length - 1; i >= 0; i--) {
+        if (typeof chapters[i].pageIndex === 'number' && chapters[i].pageIndex <= state.currentIndex) {
+          bestIndex = i;
+          break;
+        }
+      }
+      activeIndex = bestIndex;
+    }
+  }
 
   chapterNav.innerHTML = `
     <button id="prevChapBtn" ${activeIndex === 0 ? 'disabled' : ''}>上一章</button>
@@ -141,8 +155,8 @@ export function renderChapterNav() {
   const prevBtn = document.getElementById('prevChapBtn');
   const nextBtn = document.getElementById('nextChapBtn');
 
-  if (prevBtn) prevBtn.onclick = () => goToChapter(activeIndex - 1);
-  if (nextBtn) nextBtn.onclick = () => goToChapter(activeIndex + 1);
+  if (prevBtn) prevBtn.onclick = goToPreviousChapter;
+  if (nextBtn) nextBtn.onclick = goToNextChapter;
 }
 
 // Navigate to chapter
@@ -168,13 +182,20 @@ export function goToChapter(index) {
 // Navigation helper functions
 export function goToPreviousChapter() { 
   if (state.type === 'pdf') {
-    const chapters = state.chapters || [];
-    let idx = 0;
-    for (let i = 0; i < chapters.length; i++) {
-      const p = typeof chapters[i].pageIndex === 'number' ? chapters[i].pageIndex : null;
-      if (p !== null && p <= state.currentIndex) idx = i;
+    // 获取当前章节索引
+    let currentChapterIndex = state.currentChapterIndex;
+    if (typeof currentChapterIndex !== 'number' || currentChapterIndex < 0) {
+      // 如果没有明确的章节索引，根据页面计算
+      const chapters = state.chapters || [];
+      currentChapterIndex = 0;
+      for (let i = chapters.length - 1; i >= 0; i--) {
+        if (typeof chapters[i].pageIndex === 'number' && chapters[i].pageIndex <= state.currentIndex) {
+          currentChapterIndex = i;
+          break;
+        }
+      }
     }
-    goToChapter(idx - 1);
+    goToChapter(currentChapterIndex - 1);
   } else {
     goToChapter(state.currentIndex - 1);
   }
@@ -182,13 +203,20 @@ export function goToPreviousChapter() {
 
 export function goToNextChapter() { 
   if (state.type === 'pdf') {
-    const chapters = state.chapters || [];
-    let idx = 0;
-    for (let i = 0; i < chapters.length; i++) {
-      const p = typeof chapters[i].pageIndex === 'number' ? chapters[i].pageIndex : null;
-      if (p !== null && p <= state.currentIndex) idx = i;
+    // 获取当前章节索引
+    let currentChapterIndex = state.currentChapterIndex;
+    if (typeof currentChapterIndex !== 'number' || currentChapterIndex < 0) {
+      // 如果没有明确的章节索引，根据页面计算
+      const chapters = state.chapters || [];
+      currentChapterIndex = 0;
+      for (let i = chapters.length - 1; i >= 0; i--) {
+        if (typeof chapters[i].pageIndex === 'number' && chapters[i].pageIndex <= state.currentIndex) {
+          currentChapterIndex = i;
+          break;
+        }
+      }
     }
-    goToChapter(idx + 1);
+    goToChapter(currentChapterIndex + 1);
   } else {
     goToChapter(state.currentIndex + 1);
   }

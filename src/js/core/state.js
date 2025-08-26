@@ -5,6 +5,7 @@ export const state = {
   rendition: null, 
   chapters: [], 
   currentIndex: 0,
+  currentChapterIndex: -1, // PDF模式下的当前章节索引
   fontSize: 18, 
   theme: 'light', 
   txtPages: [], 
@@ -28,6 +29,7 @@ export function resetBookState() {
     rendition: null,
     chapters: [],
     currentIndex: 0,
+    currentChapterIndex: -1,
     txtPages: [],
     currentFileKey: null,
     bookmarks: []
