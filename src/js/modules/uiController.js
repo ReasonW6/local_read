@@ -93,10 +93,23 @@ export function renderTOC() {
 export function updateActiveTOC() {
   const toc = DOM.toc();
   if (!toc) return;
-  
+
+  function getPdfChapterIndexByPage(page) {
+    const chapters = state.chapters || [];
+    if (chapters.length === 0) return 0;
+    let idx = 0;
+    for (let i = 0; i < chapters.length; i++) {
+      const p = typeof chapters[i].pageIndex === 'number' ? chapters[i].pageIndex : null;
+      if (p !== null && p <= page) idx = i;
+    }
+    return idx;
+  }
+
+  const activeIndex = state.type === 'pdf' ? getPdfChapterIndexByPage(state.currentIndex) : state.currentIndex;
+
   Array.from(toc.children).forEach((el, idx) => {
-    el.classList.toggle('active', idx === state.currentIndex);
-    if (idx === state.currentIndex && el.scrollIntoView) {
+    el.classList.toggle('active', idx === activeIndex);
+    if (idx === activeIndex && el.scrollIntoView) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   });
@@ -106,17 +119,30 @@ export function updateActiveTOC() {
 export function renderChapterNav() {
   const chapterNav = DOM.chapterNav();
   if (!chapterNav) return;
-  
+
+  function getPdfChapterIndexByPage(page) {
+    const chapters = state.chapters || [];
+    if (chapters.length === 0) return 0;
+    let idx = 0;
+    for (let i = 0; i < chapters.length; i++) {
+      const p = typeof chapters[i].pageIndex === 'number' ? chapters[i].pageIndex : null;
+      if (p !== null && p <= page) idx = i;
+    }
+    return idx;
+  }
+
+  const activeIndex = state.type === 'pdf' ? getPdfChapterIndexByPage(state.currentIndex) : state.currentIndex;
+
   chapterNav.innerHTML = `
-    <button id="prevChapBtn" ${state.currentIndex === 0 ? 'disabled' : ''}>上一章</button>
-    <button id="nextChapBtn" ${state.currentIndex >= state.chapters.length - 1 ? 'disabled' : ''}>下一章</button>
+    <button id="prevChapBtn" ${activeIndex === 0 ? 'disabled' : ''}>上一章</button>
+    <button id="nextChapBtn" ${activeIndex >= state.chapters.length - 1 ? 'disabled' : ''}>下一章</button>
   `;
-  
+
   const prevBtn = document.getElementById('prevChapBtn');
   const nextBtn = document.getElementById('nextChapBtn');
-  
-  if (prevBtn) prevBtn.onclick = goToPreviousChapter;
-  if (nextBtn) nextBtn.onclick = goToNextChapter;
+
+  if (prevBtn) prevBtn.onclick = () => goToChapter(activeIndex - 1);
+  if (nextBtn) nextBtn.onclick = () => goToChapter(activeIndex + 1);
 }
 
 // Navigate to chapter
@@ -141,11 +167,31 @@ export function goToChapter(index) {
 
 // Navigation helper functions
 export function goToPreviousChapter() { 
-  goToChapter(state.currentIndex - 1); 
+  if (state.type === 'pdf') {
+    const chapters = state.chapters || [];
+    let idx = 0;
+    for (let i = 0; i < chapters.length; i++) {
+      const p = typeof chapters[i].pageIndex === 'number' ? chapters[i].pageIndex : null;
+      if (p !== null && p <= state.currentIndex) idx = i;
+    }
+    goToChapter(idx - 1);
+  } else {
+    goToChapter(state.currentIndex - 1);
+  }
 }
 
 export function goToNextChapter() { 
-  goToChapter(state.currentIndex + 1); 
+  if (state.type === 'pdf') {
+    const chapters = state.chapters || [];
+    let idx = 0;
+    for (let i = 0; i < chapters.length; i++) {
+      const p = typeof chapters[i].pageIndex === 'number' ? chapters[i].pageIndex : null;
+      if (p !== null && p <= state.currentIndex) idx = i;
+    }
+    goToChapter(idx + 1);
+  } else {
+    goToChapter(state.currentIndex + 1);
+  }
 }
 
 // Close sidebar when opening a book from bookshelf

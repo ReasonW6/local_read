@@ -113,7 +113,7 @@ async function buildChaptersFromOutline(pdfDoc, outline) {
     const k = c._pageIndex ?? c.href;
     if (!seen.has(k)) {
       seen.add(k);
-      uniq.push({ label: c.label, href: c.href, level: Math.max(1, Math.min(3, c.level || 1)) });
+      uniq.push({ label: c.label, href: c.href, level: Math.max(1, Math.min(3, c.level || 1)), pageIndex: c._pageIndex });
     }
   }
   return uniq;
@@ -290,7 +290,8 @@ export async function openPdf(arrayBuffer) {
       chapters = Array.from({ length: pageCount }, (_, i) => ({
         label: `第${i + 1}页`,
         href: `#pdf-page-${i + 1}`,
-        level: 1
+        level: 1,
+        pageIndex: i
       }));
     }
 
@@ -332,13 +333,25 @@ export async function openPdf(arrayBuffer) {
 }
 
 // 章节跳转（页跳转）
-export function goToPdfChapter(index) {
-  if (index < 0 || index >= state.chapters.length || state.isNavigating) return;
+export function goToPdfChapter(target) {
+  if (state.isNavigating) return;
+  const pageCount = state.book?.numPages || 0;
+
+  // 支持两种调用：
+  // 1) 目录点击传入章节索引 -> 使用章节的 pageIndex
+  // 2) 书签/恢复传入页索引 -> 直接作为页码
+  let page = 0;
+  if (Array.isArray(state.chapters) && state.chapters[target] && typeof state.chapters[target].pageIndex === 'number') {
+    page = state.chapters[target].pageIndex;
+  } else {
+    page = Math.max(0, Math.min(pageCount - 1, Number(target) || 0));
+  }
+
   setNavigating(true);
-  updateState({ currentIndex: index });
+  updateState({ currentIndex: page });
   updateActiveTOC();
   renderChapterNav();
-  scrollToPdfPage(index);
+  scrollToPdfPage(page);
   setTimeout(() => setNavigating(false), 50);
 }
 
