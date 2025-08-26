@@ -81,12 +81,21 @@ function applyEpubTypographyToContents(prefs) {
 function saveCompleteReadingState() {
   if (!state.currentFileKey) return;
   
+  // 获取当前阅读进度百分比
+  const scroller = document.querySelector('.main');
+  let readingPercentage = 0;
+  if (scroller) {
+    const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+    readingPercentage = Math.min(100, Math.max(0, (scroller.scrollTop / max) * 100));
+  }
+  
   const currentPrefs = getReadingPrefs();
   const completeState = {
     fontSize: state.fontSize,
     theme: state.theme,
     paraSpacing: currentPrefs.paraSpacing,
     letterSpacing: currentPrefs.letterSpacing,
+    readingPercentage: readingPercentage, // 保存阅读进度百分比
     timestamp: Date.now()
   };
   
@@ -142,6 +151,21 @@ function loadCompleteReadingState() {
       updateSettingsPanelUI(newPrefs);
     }
     
+    // 恢复阅读进度百分比
+    if (savedState.readingPercentage !== undefined) {
+      // 延迟执行，确保内容已加载
+      setTimeout(() => {
+        const scroller = document.querySelector('.main');
+        if (scroller) {
+          const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+          const scrollTop = (savedState.readingPercentage / 100) * max;
+          scroller.scrollTop = scrollTop;
+          // 更新进度条显示
+          updateReadingProgress();
+        }
+      }, 300); // 给予足够的时间让内容渲染完成
+    }
+    
   } catch (error) {
     console.warn('Failed to load complete reading state:', error);
   }
@@ -169,9 +193,14 @@ function manualSaveProgress() {
     manualSaveTxtProgress();
   }
   
-  // 保存完整的阅读设置
+  // 保存完整的阅读设置（包括阅读进度百分比）
   saveCompleteReadingState();
+  
+  // 显示保存指示器
   showSavedIndicator();
+  
+  // 更新顶部进度条显示
+  updateReadingProgress();
 }
 
 // Enhanced book opening function
@@ -191,10 +220,10 @@ async function openBook(book, fileData) {
     // 关闭侧边栏（如果当前显示的是书架）
     closeSidebarIfBookshelf();
     
-    // 延迟加载完整的阅读状态（包括字体、主题、排版等）
+    // 延迟加载完整的阅读状态（包括字体、主题、排版和阅读进度百分比等）
     setTimeout(() => {
       loadCompleteReadingState();
-    }, 300);
+    }, 500); // 增加延迟时间，确保内容完全加载
     
   } catch (error) {
     console.error('Error opening book:', error);
