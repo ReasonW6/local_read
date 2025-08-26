@@ -225,6 +225,9 @@ function showSavedIndicator() {
   }, 1200);
 }
 
+// 保存当前阅读位置的百分比
+let lastReadingPercentage = 0;
+
 /** 阅读进度条 */
 function updateReadingProgress() {
   const scroller = document.querySelector('.main');
@@ -233,8 +236,23 @@ function updateReadingProgress() {
   if (!scroller || (!bar && !text)) return;
   const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
   const pct = Math.min(100, Math.max(0, (scroller.scrollTop / max) * 100));
+  lastReadingPercentage = pct; // 保存当前百分比
   if (bar) bar.style.width = pct.toFixed(2) + '%';
   if (text) text.textContent = Math.round(pct) + '%';
+}
+
+// 根据保存的阅读百分比恢复滚动位置
+function restoreScrollPositionByPercentage() {
+  const scroller = document.querySelector('.main');
+  if (!scroller) return;
+  
+  // 等待DOM更新完成后再计算新的滚动位置
+  setTimeout(() => {
+    const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+    const scrollTop = (lastReadingPercentage / 100) * max;
+    scroller.scrollTop = scrollTop;
+    updateReadingProgress(); // 更新进度条显示
+  }, 50);
 }
 
 function initReadingProgress() {
@@ -261,16 +279,18 @@ function initKeyboardShortcuts() {
         break;
       case '+':
       case '=':
+        updateReadingProgress(); // 先保存当前百分比
         changeFontSize(1);
         saveCompleteReadingState();
-        requestAnimationFrame(updateReadingProgress);
+        restoreScrollPositionByPercentage(); // 恢复到相同百分比位置
         e.preventDefault();
         break;
       case '-':
       case '_':
+        updateReadingProgress(); // 先保存当前百分比
         changeFontSize(-1);
         saveCompleteReadingState();
-        requestAnimationFrame(updateReadingProgress);
+        restoreScrollPositionByPercentage(); // 恢复到相同百分比位置
         e.preventDefault();
         break;
       case 't':
@@ -470,10 +490,11 @@ function initSettingsPanel() {
 
 // 暴露函数到全局，供 HTML 中的 onclick 使用
 window.changeFontSize = (delta) => {
+  updateReadingProgress(); // 先保存当前百分比
   changeFontSize(delta);
   saveCompleteReadingState();
   updateSettingsStatus();
-  requestAnimationFrame(updateReadingProgress);
+  restoreScrollPositionByPercentage(); // 恢复到相同百分比位置
 };
 
 window.toggleTheme = () => {
@@ -581,16 +602,18 @@ function setupEventListeners() {
   }
   if (fontIncreaseBtn) {
     fontIncreaseBtn.addEventListener('click', () => { 
+      updateReadingProgress(); // 先保存当前百分比
       changeFontSize(1); 
       saveCompleteReadingState();
-      requestAnimationFrame(updateReadingProgress); 
+      restoreScrollPositionByPercentage(); // 恢复到相同百分比位置
     });
   }
   if (fontDecreaseBtn) {
     fontDecreaseBtn.addEventListener('click', () => { 
+      updateReadingProgress(); // 先保存当前百分比
       changeFontSize(-1); 
       saveCompleteReadingState();
-      requestAnimationFrame(updateReadingProgress); 
+      restoreScrollPositionByPercentage(); // 恢复到相同百分比位置
     });
   }
   
