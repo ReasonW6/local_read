@@ -577,6 +577,165 @@ function initSidebarAutoClose() {
   });
 }
 
+/* ========== 文件上传与拖拽功能 ========== */
+
+// 处理文件选择上传
+async function handleFileUpload(event) {
+  const files = Array.from(event.target.files);
+  if (files.length === 0) return;
+  
+  await uploadFiles(files);
+  // 清除选择，允许重复选择同一文件
+  event.target.value = '';
+}
+
+// 处理拖拽进入
+function handleDragEnter(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add('drag-over');
+}
+
+// 处理拖拽悬停
+function handleDragOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+}
+
+// 处理拖拽离开
+function handleDragLeave(event) {
+  event.preventDefault();
+  // 只有当拖拽完全离开容器时才移除样式
+  if (!event.currentTarget.contains(event.relatedTarget)) {
+    event.currentTarget.classList.remove('drag-over');
+  }
+}
+
+// 处理文件拖拽放置
+async function handleDrop(event) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over');
+  
+  const files = Array.from(event.dataTransfer.files);
+  if (files.length === 0) return;
+  
+  // 过滤支持的文件类型
+  const supportedFiles = files.filter(file => {
+    const ext = file.name.toLowerCase();
+    return ext.endsWith('.epub') || ext.endsWith('.txt') || ext.endsWith('.pdf');
+  });
+  
+  if (supportedFiles.length === 0) {
+    alert('请拖拽 .epub、.txt 或 .pdf 格式的文件');
+    return;
+  }
+  
+  if (supportedFiles.length !== files.length) {
+    const skipped = files.length - supportedFiles.length;
+    alert(`已忽略 ${skipped} 个不支持的文件，只处理 .epub、.txt、.pdf 格式`);
+  }
+  
+  await uploadFiles(supportedFiles);
+}
+
+// 上传文件到服务器
+async function uploadFiles(files) {
+  if (files.length === 0) return;
+  
+  const formData = new FormData();
+  files.forEach(file => {
+    formData.append('books', file);
+  });
+  
+  try {
+    // 显示上传提示
+    showUploadProgress(`正在上传 ${files.length} 个文件...`);
+    
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`上传失败: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    // 显示成功消息
+    showUploadProgress(result.message, 'success');
+    
+    // 自动刷新书架
+    setTimeout(() => {
+      loadBookshelf();
+      hideUploadProgress();
+    }, 1500);
+    
+  } catch (error) {
+    console.error('Upload error:', error);
+    showUploadProgress(`上传失败: ${error.message}`, 'error');
+    setTimeout(hideUploadProgress, 3000);
+  }
+}
+
+// 显示上传进度提示
+function showUploadProgress(message, type = 'info') {
+  let indicator = document.getElementById('upload-indicator');
+  
+  if (!indicator) {
+    indicator = document.createElement('div');
+    indicator.id = 'upload-indicator';
+    indicator.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: var(--toolbar-bg);
+      color: var(--text);
+      padding: 12px 16px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px var(--shadow-color);
+      border: 1px solid var(--border-color);
+      z-index: 2000;
+      font-size: 14px;
+      max-width: 300px;
+      transition: all 0.3s ease;
+      transform: translateX(100%);
+    `;
+    document.body.appendChild(indicator);
+  }
+  
+  indicator.textContent = message;
+  
+  // 设置不同类型的样式
+  if (type === 'success') {
+    indicator.style.borderLeftColor = '#4CAF50';
+    indicator.style.borderLeftWidth = '4px';
+  } else if (type === 'error') {
+    indicator.style.borderLeftColor = '#F44336';
+    indicator.style.borderLeftWidth = '4px';
+  } else {
+    indicator.style.borderLeftColor = 'var(--accent)';
+    indicator.style.borderLeftWidth = '4px';
+  }
+  
+  // 显示动画
+  requestAnimationFrame(() => {
+    indicator.style.transform = 'translateX(0)';
+  });
+}
+
+// 隐藏上传进度提示
+function hideUploadProgress() {
+  const indicator = document.getElementById('upload-indicator');
+  if (indicator) {
+    indicator.style.transform = 'translateX(100%)';
+    setTimeout(() => {
+      if (indicator.parentNode) {
+        indicator.parentNode.removeChild(indicator);
+      }
+    }, 300);
+  }
+}
+
 // Setup event listeners
 function setupEventListeners() {
   // Core functionality
@@ -619,6 +778,27 @@ function setupEventListeners() {
   const refreshBookshelfBtn = DOM.refreshBookshelfBtn();
   if (refreshBookshelfBtn) {
     refreshBookshelfBtn.addEventListener('click', loadBookshelf);
+  }
+  
+  // Add books functionality
+  const addBooksBtn = document.getElementById('addBooksBtn');
+  const fileInput = document.getElementById('fileInput');
+  const bookshelf = document.getElementById('bookshelfList').parentElement;
+  
+  if (addBooksBtn && fileInput) {
+    addBooksBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+    
+    fileInput.addEventListener('change', handleFileUpload);
+  }
+  
+  // Drag and drop functionality
+  if (bookshelf) {
+    bookshelf.addEventListener('dragover', handleDragOver);
+    bookshelf.addEventListener('dragenter', handleDragEnter);
+    bookshelf.addEventListener('dragleave', handleDragLeave);
+    bookshelf.addEventListener('drop', handleDrop);
   }
   
   // Theme and font controls

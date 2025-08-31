@@ -70,7 +70,11 @@
                 <div style="font-weight:700">书架</div>
                 <div id="bookshelfList"></div>
             </div>
-            <button id="refreshBookshelfBtn">刷新书架</button>
+            <div class="bookshelf-actions">
+                <button id="addBooksBtn">添加书籍</button>
+                <button id="refreshBookshelfBtn">刷新书架</button>
+            </div>
+            <input type="file" id="fileInput" multiple accept=".epub,.txt,.pdf" style="display: none;">
         </div>
         <div class="toc-view">
             <div style="padding:12px;border-bottom:1px solid var(--border-color); flex-shrink: 0;">

@@ -205,15 +205,53 @@
   cursor: not-allowed; 
 }
 
-#refreshBookshelfBtn { 
-  margin: 12px; 
-  padding: 10px; 
-  border-radius: 6px; 
-  border: 1px solid var(--border-color); 
-  background: var(--hover-bg); 
-  cursor: pointer; 
-  text-align: center; 
-  flex-shrink: 0; 
+.bookshelf-actions {
+  display: flex;
+  gap: 8px;
+  margin: 12px;
+  flex-shrink: 0;
+}
+
+.bookshelf-actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--hover-bg);
+  cursor: pointer;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text);
+  transition: all 0.2s ease;
+}
+
+.bookshelf-actions button:hover {
+  background: var(--border-color);
+  transform: translateY(-1px);
+}
+
+.bookshelf-actions button:active {
+  transform: translateY(0);
+}
+
+/* 拖拽区域样式 */
+.bookshelf.drag-over {
+  background: linear-gradient(135deg, var(--accent)20, transparent);
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+}
+
+.bookshelf.drag-over::before {
+  content: "拖拽书籍文件到此处";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 600;
+  z-index: 100;
+  pointer-events: none;
 }
 
 #save-indicator { 
