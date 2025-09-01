@@ -37,8 +37,8 @@ export async function openTxt(text, fileName) {
   updateState({ chapters, txtPages });
   renderTOC();
   
-  const saved = loadProgress(state.currentFileKey);
-  displayTxtChapter(saved?.idx || 0);
+  // 显示第一章（实际的章节恢复将在 loadRemainingReadingState 中处理）
+  displayTxtChapter(0);
 }
 
 // Display specific TXT chapter

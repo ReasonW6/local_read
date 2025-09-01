@@ -104,6 +104,11 @@ function saveCompleteReadingState() {
       timestamp: Date.now()
     };
     
+    // 对于TXT文件，额外保存章节索引
+    if (state.type === 'txt') {
+      bookCompleteState.idx = state.currentIndex;
+    }
+    
     const stateKey = `reader_complete_state_${state.currentFileKey}`;
     localStorage.setItem(stateKey, JSON.stringify(bookCompleteState));
   } else {
@@ -122,6 +127,11 @@ function saveCompleteReadingState() {
       readingPercentage: readingPercentage,
       timestamp: Date.now()
     };
+    
+    // 对于TXT文件，额外保存章节索引
+    if (state.type === 'txt') {
+      bookProgress.idx = state.currentIndex;
+    }
     
     const progressKey = `reader_progress_${state.currentFileKey}`;
     localStorage.setItem(progressKey, JSON.stringify(bookProgress));
@@ -185,6 +195,13 @@ function loadCompleteReadingState() {
             }
           }, 300);
         }
+        
+        // 对于TXT文件，恢复章节索引
+        if (state.type === 'txt' && savedState.idx !== undefined) {
+          import('./modules/txtReader.js').then(({ displayTxtChapter }) => {
+            displayTxtChapter(savedState.idx);
+          });
+        }
       }
     } catch (error) {
       console.warn('Failed to load book-specific settings:', error);
@@ -240,7 +257,16 @@ function loadCompleteReadingState() {
       if (progressRaw) {
         const bookProgress = JSON.parse(progressRaw);
         
-        if (bookProgress.readingPercentage !== undefined) {
+        // 如果是TXT文件且有章节索引，恢复章节位置
+        if (state.type === 'txt' && bookProgress.idx !== undefined) {
+          setTimeout(() => {
+            state.currentIndex = bookProgress.idx;
+            // 确保 txtReader 模块已经加载
+            if (window.txtReader && typeof window.txtReader.displayTxtChapter === 'function') {
+              window.txtReader.displayTxtChapter(state.currentIndex);
+            }
+          }, 300);
+        } else if (bookProgress.readingPercentage !== undefined) {
           setTimeout(() => {
             const scroller = document.querySelector('.main');
             if (scroller) {
@@ -542,7 +568,22 @@ function loadRemainingReadingState() {
     
     const savedState = JSON.parse(raw);
     
-    // 恢复阅读进度百分比
+    // 对于TXT文件，恢复章节索引
+    if (state.type === 'txt' && savedState.idx !== undefined) {
+      state.currentIndex = savedState.idx;
+      // 确保 txtReader 模块已经加载
+      if (window.txtReader && typeof window.txtReader.displayTxtChapter === 'function') {
+        window.txtReader.displayTxtChapter(savedState.idx);
+      } else {
+        // 如果模块还没加载，动态导入
+        import('./modules/txtReader.js').then(({ displayTxtChapter }) => {
+          displayTxtChapter(savedState.idx);
+        });
+      }
+      return; // TXT文件不需要处理滚动百分比
+    }
+    
+    // 恢复阅读进度百分比（适用于非TXT文件）
     if (savedState.readingPercentage !== undefined) {
       const scroller = document.querySelector('.main');
       if (scroller) {
@@ -1513,6 +1554,10 @@ window.toggleTOC = toggleTOC;
 
 // 将简化后的函数暴露到全局作用域
 window.saveAllData = saveAllData;
+
+// 暴露模块到全局作用域以便其他函数调用
+import * as txtReader from './modules/txtReader.js';
+window.txtReader = txtReader;
 
 // Initialize application
 setupEventListeners();
