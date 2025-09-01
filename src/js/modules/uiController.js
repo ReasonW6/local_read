@@ -149,14 +149,20 @@ export function renderChapterNav() {
 
   chapterNav.innerHTML = `
     <button id="prevChapBtn" ${activeIndex === 0 ? 'disabled' : ''}>上一章</button>
+    <button id="tocNavBtn">目录</button>
     <button id="nextChapBtn" ${activeIndex >= state.chapters.length - 1 ? 'disabled' : ''}>下一章</button>
   `;
 
   const prevBtn = document.getElementById('prevChapBtn');
   const nextBtn = document.getElementById('nextChapBtn');
+  const tocBtn = document.getElementById('tocNavBtn');
 
   if (prevBtn) prevBtn.onclick = goToPreviousChapter;
   if (nextBtn) nextBtn.onclick = goToNextChapter;
+  if (tocBtn) tocBtn.onclick = () => {
+    // 切换目录面板显示状态
+    toggleSidebar(CONFIG.SIDEBAR_VIEWS.TOC);
+  };
 }
 
 // Navigate to chapter
