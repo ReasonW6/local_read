@@ -301,6 +301,93 @@
   color: var(--accent);
 }
 
+/* Current reading book styles */
+.book-item.current-reading {
+  border: 2px solid var(--accent);
+  background: linear-gradient(135deg, var(--accent)20, transparent);
+  position: relative;
+  box-shadow: 0 2px 8px var(--accent)30;
+}
+
+.book-item.current-reading::before {
+  content: "正在阅读";
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--accent);
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+  z-index: 1;
+  animation: pulse 2s infinite;
+}
+
+[data-theme="dark"] .book-item.current-reading::before {
+  color: #111;
+}
+
+/* Recently accessed book styles */
+.book-item.recently-accessed {
+  border-left: 3px solid var(--accent);
+  background: linear-gradient(90deg, var(--accent)08, transparent);
+}
+
+/* Book information styles */
+.book-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.book-path {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.book-time {
+  color: var(--accent);
+  font-weight: 500;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.book-status {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.book-status.current {
+  background: var(--accent);
+  color: white;
+}
+
+[data-theme="dark"] .book-status.current {
+  color: #111;
+}
+
+.book-status.recent {
+  background: var(--accent)20;
+  color: var(--accent);
+  border: 1px solid var(--accent)40;
+}
+
+/* Pulse animation for current reading indicator */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 /* Bookmark styles */
 .bookmark-item {
   position: relative;
@@ -533,6 +620,12 @@
   min-width: 40px;
   text-align: right;
   font-weight: 500;
+}
+.settings-description {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 8px;
+  line-height: 1.4;
 }
 .settings-reset-btn {
   background: var(--accent);

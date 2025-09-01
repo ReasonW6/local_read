@@ -13,10 +13,10 @@ REM 在一个新的窗口中启动 Node.js 服务器
 REM 这样既方便在后台运行服务，同时脚本自己会继续执行
 start "Node Server" node server.js
 
-REM 等待3秒，让服务器有足够的时间来启动
+REM 等待1秒，让服务器有足够的时间来启动
 echo.
-echo  正在等待服务器响应 (3秒)...
-timeout /t 3 /nobreak >nul
+echo  正在等待服务器响应 (1秒)...
+timeout /t 1 /nobreak >nul
 
 REM 在默认浏览器中打开阅读器页面
 echo.

@@ -1,6 +1,7 @@
 // Configuration management module
 import { state, updateState } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
+import { renderBookshelf } from './fileManager.js';
 
 // 配置管理器
 export class ConfigManager {
@@ -10,12 +11,29 @@ export class ConfigManager {
 
   // 收集所有用户数据
   collectAllData() {
+    // 从全局设置中获取主题和字体设置
+    let globalSettings = {
+      theme: state.theme,
+      fontSize: state.fontSize,
+    };
+    
+    // 尝试从localStorage的全局设置中获取更准确的数据
+    try {
+      const globalRaw = localStorage.getItem('reader_global_settings');
+      if (globalRaw) {
+        const saved = JSON.parse(globalRaw);
+        globalSettings = {
+          theme: saved.theme || state.theme,
+          fontSize: saved.fontSize || state.fontSize,
+        };
+      }
+    } catch (e) {
+      console.warn('Failed to load global settings for export:', e);
+    }
+    
     const allData = {
-      // 应用设置
-      settings: {
-        theme: state.theme,
-        fontSize: state.fontSize,
-      },
+      // 应用设置（现在是全局的）
+      settings: globalSettings,
       
       // 阅读偏好
       readingPrefs: this.getReadingPrefs(),
@@ -28,6 +46,14 @@ export class ConfigManager {
       
       // 所有书签
       bookmarks: this.getAllBookmarks(),
+      
+      // 书籍访问历史
+      bookAccessHistory: this.getBookAccessHistory(),
+      
+      // 应用偏好设置
+      appPreferences: {
+        isolateBookConfig: state.isolateBookConfig
+      },
       
       // 元数据
       metadata: {
@@ -56,16 +82,36 @@ export class ConfigManager {
   getAllReadingProgress() {
     const progress = {};
     
-    // 遍历localStorage中所有以'server_reader_'开头的键
+    // 遍历localStorage中所有以'reader_progress_'开头的键（新格式）
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('reader_progress_')) {
+        try {
+          const data = JSON.parse(localStorage.getItem(key));
+          const bookPath = key.replace('reader_progress_', '');
+          progress[bookPath] = data;
+        } catch (e) {
+          console.warn(`Failed to parse progress for ${key}:`, e);
+        }
+      }
+    }
+    
+    // 兼容旧格式：遍历localStorage中所有以'server_reader_'开头的键
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith('server_reader_')) {
         try {
           const data = JSON.parse(localStorage.getItem(key));
           const bookPath = key.replace('server_reader_', '');
-          progress[bookPath] = data;
+          // 如果新格式中还没有这本书的数据，则使用旧格式的
+          if (!progress[bookPath]) {
+            progress[bookPath] = {
+              readingPercentage: data.readingPercentage,
+              timestamp: data.timestamp
+            };
+          }
         } catch (e) {
-          console.warn(`Failed to parse progress for ${key}:`, e);
+          console.warn(`Failed to parse legacy progress for ${key}:`, e);
         }
       }
     }
@@ -92,6 +138,17 @@ export class ConfigManager {
     }
     
     return allBookmarks;
+  }
+
+  // 获取书籍访问历史
+  getBookAccessHistory() {
+    try {
+      const history = localStorage.getItem(CONFIG.STORAGE_KEYS.BOOK_ACCESS_HISTORY);
+      return history ? JSON.parse(history) : {};
+    } catch (error) {
+      console.warn('Failed to load book access history:', error);
+      return {};
+    }
   }
 
   // 保存配置到服务器
@@ -154,18 +211,32 @@ export class ConfigManager {
   // 应用配置
   async applyConfig(config) {
     try {
-      // 应用设置
+      // 应用设置（全局设置）
       if (config.settings) {
+        // 同时保存到全局设置存储中
+        let globalSettings = {};
+        try {
+          const existing = localStorage.getItem('reader_global_settings');
+          globalSettings = existing ? JSON.parse(existing) : {};
+        } catch (e) {
+          globalSettings = {};
+        }
+        
         if (config.settings.theme && config.settings.theme !== state.theme) {
           updateState({ theme: config.settings.theme });
           document.body.setAttribute('data-theme', config.settings.theme);
+          globalSettings.theme = config.settings.theme;
           this.updateThemeUI();
         }
         
         if (config.settings.fontSize && config.settings.fontSize !== state.fontSize) {
           updateState({ fontSize: config.settings.fontSize });
+          globalSettings.fontSize = config.settings.fontSize;
           this.updateFontSizeUI();
         }
+        
+        // 保存全局设置
+        localStorage.setItem('reader_global_settings', JSON.stringify(globalSettings));
       }
 
       // 应用阅读偏好
@@ -180,11 +251,16 @@ export class ConfigManager {
         localStorage.setItem(CONFIG.STORAGE_KEYS.LAST_READ_BOOK, JSON.stringify(config.lastReadBook));
       }
 
-      // 应用阅读进度
+      // 应用阅读进度（使用新的存储格式）
       if (config.readingProgress) {
         Object.entries(config.readingProgress).forEach(([bookPath, progress]) => {
-          const key = 'server_reader_' + bookPath;
-          localStorage.setItem(key, JSON.stringify(progress));
+          // 使用新的存储格式
+          const progressKey = 'reader_progress_' + bookPath;
+          localStorage.setItem(progressKey, JSON.stringify(progress));
+          
+          // 兼容性：也保存到旧格式中（如果需要）
+          const legacyKey = 'server_reader_' + bookPath;
+          localStorage.setItem(legacyKey, JSON.stringify(progress));
         });
       }
 
@@ -196,12 +272,34 @@ export class ConfigManager {
         });
       }
 
+      // 应用书籍访问历史
+      if (config.bookAccessHistory) {
+        localStorage.setItem(CONFIG.STORAGE_KEYS.BOOK_ACCESS_HISTORY, JSON.stringify(config.bookAccessHistory));
+      }
+
+      // 应用应用偏好设置
+      if (config.appPreferences) {
+        if (config.appPreferences.isolateBookConfig !== undefined) {
+          state.isolateBookConfig = config.appPreferences.isolateBookConfig;
+          localStorage.setItem('isolate_book_config', config.appPreferences.isolateBookConfig.toString());
+          
+          // 更新UI中的开关状态
+          const isolateToggle = document.getElementById('isolateBookConfigToggle');
+          if (isolateToggle) {
+            isolateToggle.checked = config.appPreferences.isolateBookConfig;
+          }
+        }
+      }
+
       // 如果当前有打开的书籍，重新加载书签
       if (state.currentFileKey) {
         const bookmarks = this.loadBookmarksForCurrentBook();
         updateState({ bookmarks });
         this.renderBookmarks();
       }
+
+      // 重新渲染书架以更新排序和状态显示
+      renderBookshelf();
 
       this.showMessage('所有配置已成功应用！', 'success');
     } catch (error) {
