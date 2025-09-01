@@ -7,6 +7,18 @@ const app = express();
 const port = 3000;
 
 const booksDirectory = path.join(__dirname, 'books');
+const configDirectory = path.join(__dirname, 'user-data');
+
+// 确保目录存在
+if (!fs.existsSync(booksDirectory)) {
+  fs.mkdirSync(booksDirectory);
+}
+if (!fs.existsSync(configDirectory)) {
+  fs.mkdirSync(configDirectory);
+}
+
+// 中间件：解析JSON请求体
+app.use(express.json({ limit: '10mb' }));
 
 // 配置multer用于文件上传
 const storage = multer.diskStorage({
@@ -81,6 +93,145 @@ app.get('/api/bookshelf', (req, res) => {
   } catch (error) {
     console.error('Error reading bookshelf:', error);
     res.status(500).json({ error: 'Failed to read bookshelf directory.' });
+  }
+});
+
+// API: 保存用户配置
+app.post('/api/save-config', (req, res) => {
+  try {
+    const { config, filename } = req.body;
+    
+    if (!config) {
+      return res.status(400).json({ error: '配置数据不能为空' });
+    }
+    
+    // 生成文件名（如果没有提供）
+    const configFilename = filename || `reader-config-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+    const configPath = path.join(configDirectory, configFilename);
+    
+    // 添加元数据
+    const configWithMeta = {
+      ...config,
+      metadata: {
+        ...config.metadata,
+        savedAt: new Date().toISOString(),
+        version: '1.0.0',
+        appName: 'Local E-Book Reader'
+      }
+    };
+    
+    fs.writeFileSync(configPath, JSON.stringify(configWithMeta, null, 2));
+    
+    res.json({ 
+      success: true, 
+      message: '配置保存成功',
+      filename: configFilename,
+      path: configPath
+    });
+  } catch (error) {
+    console.error('Error saving config:', error);
+    res.status(500).json({ error: '保存配置失败: ' + error.message });
+  }
+});
+
+// API: 加载用户配置
+app.get('/api/load-config/:filename', (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const configPath = path.join(configDirectory, filename);
+    
+    if (!fs.existsSync(configPath)) {
+      return res.status(404).json({ error: '配置文件不存在' });
+    }
+    
+    const configData = fs.readFileSync(configPath, 'utf8');
+    const config = JSON.parse(configData);
+    
+    res.json({
+      success: true,
+      config: config,
+      filename: filename
+    });
+  } catch (error) {
+    console.error('Error loading config:', error);
+    res.status(500).json({ error: '加载配置失败: ' + error.message });
+  }
+});
+
+// API: 获取所有保存的配置文件列表
+app.get('/api/config-list', (req, res) => {
+  try {
+    const files = fs.readdirSync(configDirectory)
+      .filter(file => file.endsWith('.json'))
+      .map(file => {
+        const filePath = path.join(configDirectory, file);
+        const stats = fs.statSync(filePath);
+        
+        // 尝试读取文件元数据
+        let metadata = null;
+        try {
+          const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          metadata = content.metadata;
+        } catch (e) {
+          // 忽略解析错误
+        }
+        
+        return {
+          filename: file,
+          size: stats.size,
+          createdAt: stats.birthtime.toISOString(),
+          modifiedAt: stats.mtime.toISOString(),
+          metadata: metadata
+        };
+      })
+      .sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt)); // 按修改时间倒序
+    
+    res.json({
+      success: true,
+      configs: files
+    });
+  } catch (error) {
+    console.error('Error listing configs:', error);
+    res.status(500).json({ error: '获取配置列表失败: ' + error.message });
+  }
+});
+
+// API: 删除配置文件
+app.delete('/api/config/:filename', (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const configPath = path.join(configDirectory, filename);
+    
+    if (!fs.existsSync(configPath)) {
+      return res.status(404).json({ error: '配置文件不存在' });
+    }
+    
+    fs.unlinkSync(configPath);
+    
+    res.json({
+      success: true,
+      message: '配置文件删除成功'
+    });
+  } catch (error) {
+    console.error('Error deleting config:', error);
+    res.status(500).json({ error: '删除配置失败: ' + error.message });
+  }
+});
+
+// API: 下载配置文件
+app.get('/api/download-config/:filename', (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const configPath = path.join(configDirectory, filename);
+    
+    if (!fs.existsSync(configPath)) {
+      return res.status(404).json({ error: '配置文件不存在' });
+    }
+    
+    res.download(configPath, filename);
+  } catch (error) {
+    console.error('Error downloading config:', error);
+    res.status(500).json({ error: '下载配置失败: ' + error.message });
   }
 });
 

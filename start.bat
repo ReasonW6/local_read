@@ -1,26 +1,27 @@
 @echo off
-REM ÉèÖÃÃüÁîÐÐ´°¿ÚµÄ±êÌâ
+chcp 65001 >nul
+REM æœ¬åœ°ç”µå­ä¹¦é˜…è¯»å™¨çš„å¯åŠ¨è„šæœ¬
 title Local E-Book Reader
 
-REM ÏÔÊ¾ÌáÊ¾ÐÅÏ¢
+REM æ˜¾ç¤ºæç¤ºä¿¡æ¯
 echo ==================================================
-echo  ÕýÔÚÆô¶¯±¾µØµç×ÓÊéÔÄ¶ÁÆ÷·þÎñÆ÷...
-echo  Çë²»Òª¹Ø±ÕÐÂµ¯³öµÄºÚÉ«ÃüÁîÐÐ´°¿Ú¡£
+echo  æ­£åœ¨å¯åŠ¨æœ¬åœ°ç”µå­ä¹¦é˜…è¯»å™¨æœåŠ¡å™¨...
+echo  è¯·ä¸è¦å…³é—­æ­¤çª—å£çš„é»‘è‰²å‘½ä»¤è¡Œçª—å£ã€‚
 echo ==================================================
 
-REM ÔÚÒ»¸öÐÂµÄ´°¿ÚÖÐÆô¶¯ Node.js ·þÎñÆ÷
-REM ÕâÄÜÈÃ·þÎñÆ÷ÔÚºóÌ¨³ÖÐøÔËÐÐ£¬Í¬Ê±±¾½Å±¾¿ÉÒÔ¼ÌÐøÖ´ÐÐ
+REM åœ¨ä¸€ä¸ªæ–°çš„çª—å£ä¸­å¯åŠ¨ Node.js æœåŠ¡å™¨
+REM è¿™æ ·æ—¢æ–¹ä¾¿åœ¨åŽå°è¿è¡ŒæœåŠ¡ï¼ŒåŒæ—¶è„šæœ¬è‡ªå·±ä¼šç»§ç»­æ‰§è¡Œ
 start "Node Server" node server.js
 
-REM µÈ´ý3Ãë£¬¸ø·þÎñÆ÷×ã¹»µÄÊ±¼äÀ´³õÊ¼»¯
+REM ç­‰å¾…3ç§’ï¼Œè®©æœåŠ¡å™¨æœ‰è¶³å¤Ÿçš„æ—¶é—´æ¥å¯åŠ¨
 echo.
-echo  ÕýÔÚµÈ´ý·þÎñÆ÷ÏìÓ¦ (3Ãë)...
+echo  æ­£åœ¨ç­‰å¾…æœåŠ¡å™¨å“åº” (3ç§’)...
 timeout /t 3 /nobreak >nul
 
-REM ÔÚÄ¬ÈÏä¯ÀÀÆ÷ÖÐ´ò¿ªÔÄ¶ÁÆ÷Ò³Ãæ
+REM åœ¨é»˜è®¤æµè§ˆå™¨ä¸­æ‰“å¼€é˜…è¯»å™¨é¡µé¢
 echo.
-echo  ÕýÔÚä¯ÀÀÆ÷ÖÐ´ò¿ªÔÄ¶ÁÆ÷...
+echo  æ­£åœ¨æ‰“å¼€ç”µå­ä¹¦é˜…è¯»å™¨...
 start http://localhost:3000
 
-REM ÍË³ö±¾½Å±¾´°¿Ú
+REM é€€å‡ºå¯åŠ¨è„šæœ¬è‡ªèº«
 exit

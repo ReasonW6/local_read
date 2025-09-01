@@ -19,6 +19,7 @@ import {
   loadBookmarks 
 } from './modules/bookmarkManager.js';
 import { toggleSidebar, closeSidebarIfBookshelf, closeSidebar, goToNextChapter, goToPreviousChapter } from './modules/uiController.js';
+import { configManager } from './modules/configManager.js';
 
 /* ========== 设置面板与阅读偏好 ========== */
 const PREFS_KEY = 'reader_prefs_v1';
@@ -185,25 +186,74 @@ function updateSettingsPanelUI(prefs) {
   if (letterVal) letterVal.textContent = `${prefs.letterSpacing}px`;
 }
 
-// Enhanced save function - saves progress + settings
-function manualSaveProgress() {
-  // 保存阅读进度
-  if (state.type === 'epub') {
-    manualSaveEpubProgress();
-  } else if (state.type === 'txt') {
-    manualSaveTxtProgress();
-  } else if (state.type === 'pdf') {
-    manualSavePdfProgress();
+// 增强的一键保存所有数据功能
+async function saveAllData() {
+  try {
+    // 1. 保存当前阅读进度
+    if (state.type === 'epub') {
+      manualSaveEpubProgress();
+    } else if (state.type === 'txt') {
+      manualSaveTxtProgress();
+    } else if (state.type === 'pdf') {
+      manualSavePdfProgress();
+    }
+    
+    // 2. 保存完整的阅读状态
+    saveCompleteReadingState();
+    
+    // 3. 保存完整配置到服务器（固定文件名）
+    const config = configManager.collectAllData();
+    
+    const response = await fetch('/api/save-config', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        config: config,
+        filename: 'user-config.json' // 固定文件名
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to save config to server');
+    }
+    
+    // 4. 显示保存成功指示器
+    showSavedIndicator();
+    configManager.showMessage('所有数据已保存！', 'success');
+    
+    // 5. 更新顶部进度条显示
+    updateReadingProgress();
+    
+  } catch (error) {
+    console.error('保存数据失败:', error);
+    configManager.showMessage('保存失败: ' + error.message, 'error');
   }
-  
-  // 保存完整的阅读设置（包括阅读进度百分比）
-  saveCompleteReadingState();
-  
-  // 显示保存指示器
-  showSavedIndicator();
-  
-  // 更新顶部进度条显示
-  updateReadingProgress();
+}
+
+// 自动加载用户配置
+async function autoLoadUserConfig() {
+  try {
+    const response = await fetch('/api/load-config/user-config.json');
+    
+    if (response.ok) {
+      const result = await response.json();
+      await configManager.applyConfig(result.config);
+      console.log('用户配置已自动加载');
+      
+      // 重新渲染书架以显示最新的"最近阅读"状态
+      if (state.bookshelf.length > 0) {
+        import('./modules/fileManager.js').then(({ renderBookshelf }) => {
+          renderBookshelf();
+        });
+      }
+    } else {
+      console.log('没有找到用户配置文件，使用默认设置');
+    }
+  } catch (error) {
+    console.warn('自动加载配置失败，使用默认设置:', error);
+  }
 }
 
 // Enhanced book opening function
@@ -1025,7 +1075,7 @@ window.removeFileFromModal = removeFileFromModal;
 // Setup event listeners
 function setupEventListeners() {
   // Core functionality
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
     initializeTheme();
     initReadingProgress();
     initKeyboardShortcuts();
@@ -1033,10 +1083,14 @@ function setupEventListeners() {
     initSidebarAutoClose();
     applyTypography(getReadingPrefs());
 
-    loadBookshelf().then(() => {
+    // 加载书架
+    await loadBookshelf().then(() => {
       toggleSidebar(CONFIG.SIDEBAR_VIEWS.BOOKSHELF);
       requestAnimationFrame(updateReadingProgress);
     });
+    
+    // 自动加载用户配置（在书架加载完成后）
+    await autoLoadUserConfig();
 
     const readerInnerEl = DOM.readerInner && DOM.readerInner();
     if (readerInnerEl) {
@@ -1112,7 +1166,8 @@ function setupEventListeners() {
   const clearAllBookmarksBtn = DOM.clearAllBookmarksBtn();
   
   if (saveProgressBtn) {
-    saveProgressBtn.addEventListener('click', manualSaveProgress);
+    // 简化为一键保存功能
+    saveProgressBtn.addEventListener('click', saveAllData);
   }
   if (addBookmarkBtn) {
     addBookmarkBtn.addEventListener('click', addBookmark);
@@ -1129,14 +1184,26 @@ function setupEventListeners() {
       if (currentBook) {
         saveLastReadBook(currentBook);
       }
-      // 自动保存完整的阅读状态
-      saveCompleteReadingState();
+      // 自动保存所有数据（同步方式，避免页面关闭时丢失）
+      try {
+        const config = configManager.collectAllData();
+        // 使用 sendBeacon 或同步请求确保数据保存
+        const blob = new Blob([JSON.stringify({ config, filename: 'user-config.json' })], {
+          type: 'application/json'
+        });
+        navigator.sendBeacon('/api/save-config', blob);
+      } catch (e) {
+        console.warn('自动保存失败:', e);
+      }
     }
   });
 }
 
 // Make necessary functions available globally for HTML onclick handlers
 window.openBookFromServer = handleOpenBookFromServer;
+
+// 将简化后的函数暴露到全局作用域
+window.saveAllData = saveAllData;
 
 // Initialize application
 setupEventListeners();
