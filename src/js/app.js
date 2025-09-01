@@ -736,6 +736,292 @@ function hideUploadProgress() {
   }
 }
 
+/* ========== 添加书籍弹窗功能 ========== */
+
+// 弹窗状态管理
+let addBooksModalState = {
+  files: [],
+  isUploading: false
+};
+
+// 打开添加书籍弹窗
+function openAddBooksModal() {
+  const mask = document.getElementById('addBooksMask');
+  if (mask) {
+    // 重置状态
+    addBooksModalState.files = [];
+    addBooksModalState.isUploading = false;
+    
+    // 更新UI
+    updateFilesDisplay();
+    updateConfirmButton();
+    
+    // 显示弹窗
+    mask.classList.add('show');
+  }
+}
+
+// 关闭添加书籍弹窗
+function closeAddBooksModal() {
+  const mask = document.getElementById('addBooksMask');
+  if (mask) {
+    mask.classList.remove('show');
+    // 清理状态
+    addBooksModalState.files = [];
+    addBooksModalState.isUploading = false;
+  }
+}
+
+// 初始化添加书籍弹窗
+function initAddBooksModal() {
+  const mask = document.getElementById('addBooksMask');
+  const modal = document.getElementById('addBooksModal');
+  const closeBtn = document.getElementById('addBooksClose');
+  const dropZone = document.getElementById('dropZone');
+  const selectFilesBtn = document.getElementById('selectFilesBtn');
+  const fileInput = document.getElementById('fileInputModal');
+  const clearFilesBtn = document.getElementById('clearFilesBtn');
+  const cancelBtn = document.getElementById('cancelAddBtn');
+  const confirmBtn = document.getElementById('confirmAddBtn');
+
+  // 关闭按钮事件
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeAddBooksModal);
+  }
+  
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', closeAddBooksModal);
+  }
+
+  // 点击遮罩关闭
+  if (mask) {
+    mask.addEventListener('click', (e) => {
+      if (e.target === mask) {
+        closeAddBooksModal();
+      }
+    });
+  }
+
+  // ESC键关闭
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && mask && mask.classList.contains('show')) {
+      closeAddBooksModal();
+    }
+  });
+
+  // 拖拽区域事件
+  if (dropZone) {
+    dropZone.addEventListener('click', () => {
+      if (fileInput) fileInput.click();
+    });
+    
+    dropZone.addEventListener('dragover', handleModalDragOver);
+    dropZone.addEventListener('dragenter', handleModalDragEnter);
+    dropZone.addEventListener('dragleave', handleModalDragLeave);
+    dropZone.addEventListener('drop', handleModalDrop);
+  }
+
+  // 选择文件按钮
+  if (selectFilesBtn) {
+    selectFilesBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (fileInput) fileInput.click();
+    });
+  }
+
+  // 文件输入变化
+  if (fileInput) {
+    fileInput.addEventListener('change', handleModalFileSelect);
+  }
+
+  // 清空文件按钮
+  if (clearFilesBtn) {
+    clearFilesBtn.addEventListener('click', () => {
+      addBooksModalState.files = [];
+      updateFilesDisplay();
+      updateConfirmButton();
+    });
+  }
+
+  // 确认添加按钮
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', handleConfirmAdd);
+  }
+}
+
+// 拖拽事件处理 - 弹窗版本
+function handleModalDragOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+}
+
+function handleModalDragEnter(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add('drag-over');
+}
+
+function handleModalDragLeave(event) {
+  event.preventDefault();
+  if (!event.currentTarget.contains(event.relatedTarget)) {
+    event.currentTarget.classList.remove('drag-over');
+  }
+}
+
+function handleModalDrop(event) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over');
+  
+  const files = Array.from(event.dataTransfer.files);
+  addFilesToModal(files);
+}
+
+// 文件选择事件处理
+function handleModalFileSelect(event) {
+  const files = Array.from(event.target.files);
+  addFilesToModal(files);
+  // 清除选择，允许重复选择
+  event.target.value = '';
+}
+
+// 添加文件到弹窗
+function addFilesToModal(files) {
+  const supportedFiles = files.filter(file => {
+    const ext = file.name.toLowerCase();
+    return ext.endsWith('.epub') || ext.endsWith('.txt') || ext.endsWith('.pdf');
+  });
+
+  if (supportedFiles.length === 0) {
+    alert('请选择 .epub、.txt 或 .pdf 格式的文件');
+    return;
+  }
+
+  if (supportedFiles.length !== files.length) {
+    const skipped = files.length - supportedFiles.length;
+    alert(`已忽略 ${skipped} 个不支持的文件，只添加 .epub、.txt、.pdf 格式`);
+  }
+
+  // 避免重复文件
+  supportedFiles.forEach(file => {
+    const exists = addBooksModalState.files.some(f => 
+      f.name === file.name && f.size === file.size
+    );
+    if (!exists) {
+      addBooksModalState.files.push(file);
+    }
+  });
+
+  updateFilesDisplay();
+  updateConfirmButton();
+}
+
+// 更新文件显示
+function updateFilesDisplay() {
+  const filesList = document.getElementById('filesList');
+  if (!filesList) return;
+
+  if (addBooksModalState.files.length === 0) {
+    filesList.innerHTML = `
+      <div class="files-empty">
+        <p>还没有选择任何文件</p>
+      </div>
+    `;
+    return;
+  }
+
+  filesList.innerHTML = addBooksModalState.files.map((file, index) => {
+    const ext = getFileExtension(file.name);
+    const size = formatFileSize(file.size);
+    
+    return `
+      <div class="file-item">
+        <div class="file-icon ${ext}">
+          ${ext}
+        </div>
+        <div class="file-info">
+          <p class="file-name" title="${file.name}">${file.name}</p>
+          <p class="file-size">${size}</p>
+        </div>
+        <button class="file-remove" onclick="removeFileFromModal(${index})" title="移除">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+// 移除文件
+function removeFileFromModal(index) {
+  addBooksModalState.files.splice(index, 1);
+  updateFilesDisplay();
+  updateConfirmButton();
+}
+
+// 更新确认按钮状态
+function updateConfirmButton() {
+  const confirmBtn = document.getElementById('confirmAddBtn');
+  if (!confirmBtn) return;
+
+  const hasFiles = addBooksModalState.files.length > 0;
+  const isUploading = addBooksModalState.isUploading;
+  
+  confirmBtn.disabled = !hasFiles || isUploading;
+  
+  const btnText = confirmBtn.querySelector('.btn-text');
+  const btnLoading = confirmBtn.querySelector('.btn-loading');
+  
+  if (btnText && btnLoading) {
+    if (isUploading) {
+      btnText.style.display = 'none';
+      btnLoading.style.display = 'flex';
+    } else {
+      btnText.style.display = 'block';
+      btnLoading.style.display = 'none';
+      btnText.textContent = hasFiles ? `添加 ${addBooksModalState.files.length} 个书籍` : '添加书籍';
+    }
+  }
+}
+
+// 确认添加书籍
+async function handleConfirmAdd() {
+  if (addBooksModalState.files.length === 0 || addBooksModalState.isUploading) return;
+
+  addBooksModalState.isUploading = true;
+  updateConfirmButton();
+
+  try {
+    await uploadFiles(addBooksModalState.files);
+    
+    // 上传成功，关闭弹窗
+    setTimeout(() => {
+      closeAddBooksModal();
+    }, 1500);
+    
+  } catch (error) {
+    // 错误已在uploadFiles中处理
+    addBooksModalState.isUploading = false;
+    updateConfirmButton();
+  }
+}
+
+// 辅助函数
+function getFileExtension(filename) {
+  return filename.split('.').pop().toLowerCase();
+}
+
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// 将函数暴露到全局作用域供HTML使用
+window.removeFileFromModal = removeFileFromModal;
+
 // Setup event listeners
 function setupEventListeners() {
   // Core functionality
@@ -780,26 +1066,15 @@ function setupEventListeners() {
     refreshBookshelfBtn.addEventListener('click', loadBookshelf);
   }
   
-  // Add books functionality
+  // Add books functionality - Modal based
   const addBooksBtn = document.getElementById('addBooksBtn');
-  const fileInput = document.getElementById('fileInput');
-  const bookshelf = document.getElementById('bookshelfList').parentElement;
   
-  if (addBooksBtn && fileInput) {
-    addBooksBtn.addEventListener('click', () => {
-      fileInput.click();
-    });
-    
-    fileInput.addEventListener('change', handleFileUpload);
+  if (addBooksBtn) {
+    addBooksBtn.addEventListener('click', openAddBooksModal);
   }
   
-  // Drag and drop functionality
-  if (bookshelf) {
-    bookshelf.addEventListener('dragover', handleDragOver);
-    bookshelf.addEventListener('dragenter', handleDragEnter);
-    bookshelf.addEventListener('dragleave', handleDragLeave);
-    bookshelf.addEventListener('drop', handleDrop);
-  }
+  // Initialize add books modal
+  initAddBooksModal();
   
   // Theme and font controls
   const themeToggle = DOM.themeToggle();
