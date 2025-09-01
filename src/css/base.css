@@ -11,6 +11,7 @@
   --toolbar-bg: #FFFFFF;
   --para-spacing: 1;
   --letter-spacing: 0.2px;
+  --font-size: 18px; /* 默认字体大小 */
 }
 
 [data-theme="dark"]{ 
@@ -66,7 +67,7 @@ body{
   box-shadow:0 2px 10px var(--shadow-color);
   height: fit-content;
   min-height: 95%;
-  font-size: 18px; 
+  font-size: var(--font-size, 18px); /* 使用CSS变量 */
 }
 
 .reader h1{

@@ -232,6 +232,46 @@ async function saveAllData() {
   }
 }
 
+// 预加载全局设置（字体大小、主题等），确保启动时就是正确的设置
+async function preloadGlobalSettings() {
+  try {
+    const response = await fetch('/api/load-config/user-config.json');
+    
+    if (response.ok) {
+      const result = await response.json();
+      const config = result.config;
+      
+      // 立即应用全局字体设置
+      if (config.settings && config.settings.fontSize) {
+        state.fontSize = config.settings.fontSize;
+        document.documentElement.style.setProperty('--font-size', config.settings.fontSize + 'px');
+        // 更新reader的字体大小（如果reader元素已存在）
+        const reader = DOM.reader();
+        if (reader) {
+          reader.style.fontSize = config.settings.fontSize + 'px';
+        }
+      }
+      
+      // 立即应用主题设置
+      if (config.settings && config.settings.theme) {
+        state.theme = config.settings.theme;
+        document.body.setAttribute('data-theme', config.settings.theme);
+      }
+      
+      // 立即应用阅读偏好
+      if (config.readingPrefs) {
+        localStorage.setItem('reader_prefs_v1', JSON.stringify(config.readingPrefs));
+        document.documentElement.style.setProperty('--para-spacing', String(config.readingPrefs.paraSpacing || 1));
+        document.documentElement.style.setProperty('--letter-spacing', `${config.readingPrefs.letterSpacing || 0.2}px`);
+      }
+      
+      console.log('全局设置已预加载');
+    }
+  } catch (error) {
+    console.log('没有找到用户配置文件，使用默认设置');
+  }
+}
+
 // 自动加载用户配置
 async function autoLoadUserConfig() {
   try {
@@ -259,6 +299,9 @@ async function autoLoadUserConfig() {
 // Enhanced book opening function
 async function openBook(book, fileData) {
   try {
+    // 在打开书籍前，预先加载字体和主题设置，避免突兀的变化
+    await preloadBookSettings();
+    
     // 加载书签
     loadBookmarks();
     
@@ -275,14 +318,124 @@ async function openBook(book, fileData) {
     // 关闭侧边栏（如果当前显示的是书架）
     closeSidebarIfBookshelf();
     
-    // 延迟加载完整的阅读状态（包括字体、主题、排版和阅读进度百分比等）
+    // 在内容加载完成后应用阅读进度和其他设置
     setTimeout(() => {
-      loadCompleteReadingState();
-    }, 500); // 增加延迟时间，确保内容完全加载
+      loadRemainingReadingState();
+    }, 200); // 减少延迟时间，因为字体设置已经预先应用
     
   } catch (error) {
     console.error('Error opening book:', error);
     throw error;
+  }
+}
+
+// 预加载书籍设置（字体、主题等），避免突兀的变化
+async function preloadBookSettings() {
+  if (!state.currentFileKey) return;
+  
+  const stateKey = `reader_complete_state_${state.currentFileKey}`;
+  try {
+    const raw = localStorage.getItem(stateKey);
+    if (!raw) return;
+    
+    const savedState = JSON.parse(raw);
+    
+    // 立即应用字体大小，避免视觉闪烁
+    if (savedState.fontSize && savedState.fontSize !== state.fontSize) {
+      await applyFontSizeImmediately(savedState.fontSize);
+    }
+    
+    // 立即应用主题，避免视觉闪烁
+    if (savedState.theme && savedState.theme !== state.theme) {
+      await applyThemeImmediately(savedState.theme);
+    }
+    
+    // 立即应用排版设置
+    if (savedState.paraSpacing !== undefined || savedState.letterSpacing !== undefined) {
+      const newPrefs = {
+        paraSpacing: savedState.paraSpacing || defaultPrefs.paraSpacing,
+        letterSpacing: savedState.letterSpacing || defaultPrefs.letterSpacing
+      };
+      saveReadingPrefs(newPrefs);
+      applyTypography(newPrefs);
+      updateSettingsPanelUI(newPrefs);
+    }
+    
+  } catch (error) {
+    console.warn('Failed to preload book settings:', error);
+  }
+}
+
+// 立即应用字体大小（无动画，无闪烁）
+async function applyFontSizeImmediately(fontSize) {
+  // 更新状态
+  state.fontSize = fontSize;
+  
+  // 直接设置CSS，无过渡效果
+  const reader = DOM.reader();
+  if (reader) {
+    reader.style.transition = 'none'; // 禁用过渡动画
+    reader.style.fontSize = fontSize + 'px';
+    // 强制重绘
+    reader.offsetHeight;
+    reader.style.transition = ''; // 恢复过渡动画
+  }
+  
+  // 更新UI显示
+  const currentFontSize = document.getElementById('currentFontSize');
+  if (currentFontSize) {
+    currentFontSize.textContent = fontSize + 'px';
+  }
+}
+
+// 立即应用主题（无动画，无闪烁）
+async function applyThemeImmediately(theme) {
+  // 更新状态
+  state.theme = theme;
+  
+  // 直接设置主题，无过渡效果
+  document.body.setAttribute('data-theme', theme);
+  
+  // 更新UI显示
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) {
+    const span = themeToggle.querySelector('span');
+    if (span) {
+      span.textContent = theme === 'dark' ? '日间' : '夜间';
+    }
+  }
+  
+  const currentTheme = document.getElementById('currentTheme');
+  if (currentTheme) {
+    currentTheme.textContent = theme === 'dark' ? '夜间模式' : '日间模式';
+  }
+}
+
+// 加载剩余的阅读状态（主要是阅读进度）
+function loadRemainingReadingState() {
+  if (!state.currentFileKey) return;
+  
+  const stateKey = `reader_complete_state_${state.currentFileKey}`;
+  try {
+    const raw = localStorage.getItem(stateKey);
+    if (!raw) return;
+    
+    const savedState = JSON.parse(raw);
+    
+    // 恢复阅读进度百分比
+    if (savedState.readingPercentage !== undefined) {
+      const scroller = document.querySelector('.main');
+      if (scroller) {
+        const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+        const scrollTop = (savedState.readingPercentage / 100) * max;
+        scroller.scrollTop = scrollTop;
+        // 更新进度条显示
+        updateReadingProgress();
+      }
+    }
+    
+  } catch (error) {
+    console.warn('Failed to load remaining reading state:', error);
   }
 }
 
@@ -1076,6 +1229,10 @@ window.removeFileFromModal = removeFileFromModal;
 function setupEventListeners() {
   // Core functionality
   document.addEventListener('DOMContentLoaded', async () => {
+    // 1. 首先加载用户配置中的基础设置（字体、主题）
+    await preloadGlobalSettings();
+    
+    // 2. 初始化各种功能模块
     initializeTheme();
     initReadingProgress();
     initKeyboardShortcuts();
@@ -1083,13 +1240,13 @@ function setupEventListeners() {
     initSidebarAutoClose();
     applyTypography(getReadingPrefs());
 
-    // 加载书架
+    // 3. 加载书架
     await loadBookshelf().then(() => {
       toggleSidebar(CONFIG.SIDEBAR_VIEWS.BOOKSHELF);
       requestAnimationFrame(updateReadingProgress);
     });
     
-    // 自动加载用户配置（在书架加载完成后）
+    // 4. 加载其他用户配置（书签、阅读进度等）
     await autoLoadUserConfig();
 
     const readerInnerEl = DOM.readerInner && DOM.readerInner();
