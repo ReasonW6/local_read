@@ -70,10 +70,7 @@
                 <div style="font-weight:700">书架</div>
                 <div id="bookshelfList"></div>
             </div>
-            <div class="bookshelf-actions">
-                <button id="addBooksBtn">添加书籍</button>
-                <button id="refreshBookshelfBtn">刷新书架</button>
-            </div>
+            <button id="refreshBookshelfBtn">刷新书架</button>
         </div>
         <div class="toc-view">
             <div style="padding:12px;border-bottom:1px solid var(--border-color); flex-shrink: 0;">
@@ -199,16 +196,6 @@
                     <input type="checkbox" id="progressBarToggle" checked />
                     <span class="toggle-slider"></span>
                   </label>
-                </div>
-              </div>
-              <div class="settings-row">
-                <span class="settings-label">隔离书籍配置</span>
-                <div class="settings-control">
-                  <label class="toggle-switch">
-                    <input type="checkbox" id="isolateBookConfigToggle" />
-                    <span class="toggle-slider"></span>
-                  </label>
-                  <span class="settings-description">开启后，每本书使用独立的字体、主题设置</span>
                 </div>
               </div>
             </div>
@@ -342,73 +329,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Add Books Modal -->
-  <div id="addBooksMask" class="add-books-mask">
-    <div id="addBooksModal" class="add-books-modal">
-      <div class="add-books-header">
-        <h2 class="add-books-title">添加书籍</h2>
-        <button id="addBooksClose" class="add-books-close">×</button>
-      </div>
-      
-      <div class="add-books-content">
-        <!-- 拖拽区域 -->
-        <div id="dropZone" class="drop-zone">
-          <div class="drop-zone-content">
-            <svg class="drop-zone-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="7,10 12,15 17,10"></polyline>
-              <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-            <h3>拖拽书籍文件到此处</h3>
-            <p>支持 .epub、.txt、.pdf 格式</p>
-            <div class="drop-zone-divider">
-              <span>或者</span>
-            </div>
-            <button id="selectFilesBtn" class="select-files-btn">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 1 2 2h12a2 2 0 0 1 2-2V8z"></path>
-                <polyline points="14,2 14,8 20,8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10,9 9,9 8,9"></polyline>
-              </svg>
-              选择文件
-            </button>
-          </div>
-        </div>
-        
-        <!-- 文件列表 -->
-        <div class="files-section">
-          <div class="files-header">
-            <h3>待添加的书籍</h3>
-            <button id="clearFilesBtn" class="clear-files-btn">清空</button>
-          </div>
-          <div id="filesList" class="files-list">
-            <div class="files-empty">
-              <p>还没有选择任何文件</p>
-            </div>
-          </div>
-        </div>
-        
-        <!-- 操作按钮 -->
-        <div class="add-books-actions">
-          <button id="cancelAddBtn" class="cancel-btn">取消</button>
-          <button id="confirmAddBtn" class="confirm-btn" disabled>
-            <span class="btn-text">添加书籍</span>
-            <span class="btn-loading" style="display: none;">
-              <svg class="loading-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 12a9 9 0 11-6.219-8.56"/>
-              </svg>
-              上传中...
-            </span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <input type="file" id="fileInputModal" multiple accept=".epub,.txt,.pdf" style="display: none;">
 
   <!-- Main Application Script -->
   <script type="module" src="src/js/app.js"></script>

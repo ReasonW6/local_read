@@ -18,7 +18,7 @@ import {
   clearAllBookmarks, 
   loadBookmarks 
 } from './modules/bookmarkManager.js';
-import { toggleSidebar, toggleTOC, closeSidebarIfBookshelf, closeSidebar, goToNextChapter, goToPreviousChapter } from './modules/uiController.js';
+import { toggleSidebar, closeSidebarIfBookshelf, closeSidebar, goToNextChapter, goToPreviousChapter } from './modules/uiController.js';
 import { configManager } from './modules/configManager.js';
 
 /* ========== 设置面板与阅读偏好 ========== */
@@ -92,195 +92,84 @@ function saveCompleteReadingState() {
   }
   
   const currentPrefs = getReadingPrefs();
+  const completeState = {
+    fontSize: state.fontSize,
+    theme: state.theme,
+    paraSpacing: currentPrefs.paraSpacing,
+    letterSpacing: currentPrefs.letterSpacing,
+    readingPercentage: readingPercentage, // 保存阅读进度百分比
+    timestamp: Date.now()
+  };
   
-  if (state.isolateBookConfig) {
-    // 隔离模式：每本书保存独立设置
-    const bookCompleteState = {
-      fontSize: state.fontSize,
-      theme: state.theme,
-      paraSpacing: currentPrefs.paraSpacing,
-      letterSpacing: currentPrefs.letterSpacing,
-      readingPercentage: readingPercentage,
-      timestamp: Date.now()
-    };
-    
-    // 对于TXT文件，额外保存章节索引
-    if (state.type === 'txt') {
-      bookCompleteState.idx = state.currentIndex;
-    }
-    
-    const stateKey = `reader_complete_state_${state.currentFileKey}`;
-    localStorage.setItem(stateKey, JSON.stringify(bookCompleteState));
-  } else {
-    // 全局模式：所有书籍共享设置
-    const globalSettings = {
-      fontSize: state.fontSize,
-      theme: state.theme,
-      paraSpacing: currentPrefs.paraSpacing,
-      letterSpacing: currentPrefs.letterSpacing,
-      timestamp: Date.now()
-    };
-    localStorage.setItem('reader_global_settings', JSON.stringify(globalSettings));
-    
-    // 保存书籍特定的阅读进度
-    const bookProgress = {
-      readingPercentage: readingPercentage,
-      timestamp: Date.now()
-    };
-    
-    // 对于TXT文件，额外保存章节索引
-    if (state.type === 'txt') {
-      bookProgress.idx = state.currentIndex;
-    }
-    
-    const progressKey = `reader_progress_${state.currentFileKey}`;
-    localStorage.setItem(progressKey, JSON.stringify(bookProgress));
-  }
+  const stateKey = `reader_complete_state_${state.currentFileKey}`;
+  localStorage.setItem(stateKey, JSON.stringify(completeState));
 }
 
 // Load and apply complete reading state
 function loadCompleteReadingState() {
   if (!state.currentFileKey) return;
   
-  if (state.isolateBookConfig) {
-    // 隔离模式：从书籍特定的设置中加载
-    const stateKey = `reader_complete_state_${state.currentFileKey}`;
-    try {
-      const raw = localStorage.getItem(stateKey);
-      if (raw) {
-        const savedState = JSON.parse(raw);
-        
-        // 应用字体大小
-        if (savedState.fontSize && savedState.fontSize !== state.fontSize) {
-          import('./modules/themeManager.js').then(({ setFontSize }) => {
-            if (setFontSize) {
-              setFontSize(savedState.fontSize);
-            } else {
-              state.fontSize = savedState.fontSize;
-              const reader = DOM.reader();
-              if (reader) reader.style.fontSize = savedState.fontSize + 'px';
-            }
-          });
+  const stateKey = `reader_complete_state_${state.currentFileKey}`;
+  try {
+    const raw = localStorage.getItem(stateKey);
+    if (!raw) return;
+    
+    const savedState = JSON.parse(raw);
+    
+    // 应用字体大小（如果与当前不同）
+    if (savedState.fontSize && savedState.fontSize !== state.fontSize) {
+      // 直接更新状态，避免触发额外的保存
+      import('./modules/themeManager.js').then(({ setFontSize }) => {
+        if (setFontSize) {
+          setFontSize(savedState.fontSize);
+        } else {
+          // 备用方案：直接设置
+          state.fontSize = savedState.fontSize;
+          const reader = DOM.reader();
+          if (reader) reader.style.fontSize = savedState.fontSize + 'px';
         }
-        
-        // 应用主题
-        if (savedState.theme && savedState.theme !== state.theme) {
-          import('./modules/themeManager.js').then(({ setTheme }) => {
-            if (setTheme) {
-              setTheme(savedState.theme);
-            }
-          });
-        }
-        
-        // 应用排版设置
-        if (savedState.paraSpacing !== undefined || savedState.letterSpacing !== undefined) {
-          const newPrefs = {
-            paraSpacing: savedState.paraSpacing || defaultPrefs.paraSpacing,
-            letterSpacing: savedState.letterSpacing || defaultPrefs.letterSpacing
-          };
-          saveReadingPrefs(newPrefs);
-          applyTypography(newPrefs);
-          updateSettingsPanelUI(newPrefs);
-        }
-        
-        // 恢复阅读进度
-        if (savedState.readingPercentage !== undefined) {
-          setTimeout(() => {
-            const scroller = document.querySelector('.main');
-            if (scroller) {
-              const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
-              const scrollTop = (savedState.readingPercentage / 100) * max;
-              scroller.scrollTop = scrollTop;
-              updateReadingProgress();
-            }
-          }, 300);
-        }
-        
-        // 对于TXT文件，恢复章节索引
-        if (state.type === 'txt' && savedState.idx !== undefined) {
-          import('./modules/txtReader.js').then(({ displayTxtChapter }) => {
-            displayTxtChapter(savedState.idx);
-          });
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to load book-specific settings:', error);
-    }
-  } else {
-    // 全局模式：加载全局设置和书籍进度
-    try {
-      const globalRaw = localStorage.getItem('reader_global_settings');
-      if (globalRaw) {
-        const globalSettings = JSON.parse(globalRaw);
-        
-        // 应用字体大小
-        if (globalSettings.fontSize && globalSettings.fontSize !== state.fontSize) {
-          import('./modules/themeManager.js').then(({ setFontSize }) => {
-            if (setFontSize) {
-              setFontSize(globalSettings.fontSize);
-            } else {
-              state.fontSize = globalSettings.fontSize;
-              const reader = DOM.reader();
-              if (reader) reader.style.fontSize = globalSettings.fontSize + 'px';
-            }
-          });
-        }
-        
-        // 应用主题
-        if (globalSettings.theme && globalSettings.theme !== state.theme) {
-          import('./modules/themeManager.js').then(({ setTheme }) => {
-            if (setTheme) {
-              setTheme(globalSettings.theme);
-            }
-          });
-        }
-        
-        // 应用排版设置
-        if (globalSettings.paraSpacing !== undefined || globalSettings.letterSpacing !== undefined) {
-          const newPrefs = {
-            paraSpacing: globalSettings.paraSpacing || defaultPrefs.paraSpacing,
-            letterSpacing: globalSettings.letterSpacing || defaultPrefs.letterSpacing
-          };
-          saveReadingPrefs(newPrefs);
-          applyTypography(newPrefs);
-          updateSettingsPanelUI(newPrefs);
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to load global settings:', error);
+      });
     }
     
-    // 加载书籍进度
-    const progressKey = `reader_progress_${state.currentFileKey}`;
-    try {
-      const progressRaw = localStorage.getItem(progressKey);
-      if (progressRaw) {
-        const bookProgress = JSON.parse(progressRaw);
-        
-        // 如果是TXT文件且有章节索引，恢复章节位置
-        if (state.type === 'txt' && bookProgress.idx !== undefined) {
-          setTimeout(() => {
-            state.currentIndex = bookProgress.idx;
-            // 确保 txtReader 模块已经加载
-            if (window.txtReader && typeof window.txtReader.displayTxtChapter === 'function') {
-              window.txtReader.displayTxtChapter(state.currentIndex);
-            }
-          }, 300);
-        } else if (bookProgress.readingPercentage !== undefined) {
-          setTimeout(() => {
-            const scroller = document.querySelector('.main');
-            if (scroller) {
-              const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
-              const scrollTop = (bookProgress.readingPercentage / 100) * max;
-              scroller.scrollTop = scrollTop;
-              updateReadingProgress();
-            }
-          }, 300);
+    // 应用主题（如果与当前不同）
+    if (savedState.theme && savedState.theme !== state.theme) {
+      import('./modules/themeManager.js').then(({ setTheme }) => {
+        if (setTheme) {
+          setTheme(savedState.theme);
         }
-      }
-    } catch (error) {
-      console.warn('Failed to load book progress:', error);
+      });
     }
+    
+    // 应用排版设置
+    if (savedState.paraSpacing !== undefined || savedState.letterSpacing !== undefined) {
+      const newPrefs = {
+        paraSpacing: savedState.paraSpacing || defaultPrefs.paraSpacing,
+        letterSpacing: savedState.letterSpacing || defaultPrefs.letterSpacing
+      };
+      saveReadingPrefs(newPrefs);
+      applyTypography(newPrefs);
+      
+      // 更新设置面板UI
+      updateSettingsPanelUI(newPrefs);
+    }
+    
+    // 恢复阅读进度百分比
+    if (savedState.readingPercentage !== undefined) {
+      // 延迟执行，确保内容已加载
+      setTimeout(() => {
+        const scroller = document.querySelector('.main');
+        if (scroller) {
+          const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+          const scrollTop = (savedState.readingPercentage / 100) * max;
+          scroller.scrollTop = scrollTop;
+          // 更新进度条显示
+          updateReadingProgress();
+        }
+      }, 300); // 给予足够的时间让内容渲染完成
+    }
+    
+  } catch (error) {
+    console.warn('Failed to load complete reading state:', error);
   }
 }
 
@@ -440,75 +329,40 @@ async function openBook(book, fileData) {
   }
 }
 
-// 预加载设置（字体、主题等），避免突兀的变化
+// 预加载书籍设置（字体、主题等），避免突兀的变化
 async function preloadBookSettings() {
-  if (state.isolateBookConfig) {
-    // 隔离模式：加载书籍特定的设置
-    if (!state.currentFileKey) return;
+  if (!state.currentFileKey) return;
+  
+  const stateKey = `reader_complete_state_${state.currentFileKey}`;
+  try {
+    const raw = localStorage.getItem(stateKey);
+    if (!raw) return;
     
-    const stateKey = `reader_complete_state_${state.currentFileKey}`;
-    try {
-      const raw = localStorage.getItem(stateKey);
-      if (!raw) return;
-      
-      const savedState = JSON.parse(raw);
-      
-      // 立即应用字体大小，避免视觉闪烁
-      if (savedState.fontSize && savedState.fontSize !== state.fontSize) {
-        await applyFontSizeImmediately(savedState.fontSize);
-      }
-      
-      // 立即应用主题，避免视觉闪烁
-      if (savedState.theme && savedState.theme !== state.theme) {
-        await applyThemeImmediately(savedState.theme);
-      }
-      
-      // 立即应用排版设置
-      if (savedState.paraSpacing !== undefined || savedState.letterSpacing !== undefined) {
-        const newPrefs = {
-          paraSpacing: savedState.paraSpacing || defaultPrefs.paraSpacing,
-          letterSpacing: savedState.letterSpacing || defaultPrefs.letterSpacing
-        };
-        saveReadingPrefs(newPrefs);
-        applyTypography(newPrefs);
-        updateSettingsPanelUI(newPrefs);
-      }
-      
-    } catch (error) {
-      console.warn('Failed to preload book-specific settings:', error);
+    const savedState = JSON.parse(raw);
+    
+    // 立即应用字体大小，避免视觉闪烁
+    if (savedState.fontSize && savedState.fontSize !== state.fontSize) {
+      await applyFontSizeImmediately(savedState.fontSize);
     }
-  } else {
-    // 全局模式：加载全局设置
-    try {
-      const raw = localStorage.getItem('reader_global_settings');
-      if (!raw) return;
-      
-      const globalSettings = JSON.parse(raw);
-      
-      // 立即应用字体大小，避免视觉闪烁
-      if (globalSettings.fontSize && globalSettings.fontSize !== state.fontSize) {
-        await applyFontSizeImmediately(globalSettings.fontSize);
-      }
-      
-      // 立即应用主题，避免视觉闪烁
-      if (globalSettings.theme && globalSettings.theme !== state.theme) {
-        await applyThemeImmediately(globalSettings.theme);
-      }
-      
-      // 立即应用排版设置
-      if (globalSettings.paraSpacing !== undefined || globalSettings.letterSpacing !== undefined) {
-        const newPrefs = {
-          paraSpacing: globalSettings.paraSpacing || defaultPrefs.paraSpacing,
-          letterSpacing: globalSettings.letterSpacing || defaultPrefs.letterSpacing
-        };
-        saveReadingPrefs(newPrefs);
-        applyTypography(newPrefs);
-        updateSettingsPanelUI(newPrefs);
-      }
-      
-    } catch (error) {
-      console.warn('Failed to preload global settings:', error);
+    
+    // 立即应用主题，避免视觉闪烁
+    if (savedState.theme && savedState.theme !== state.theme) {
+      await applyThemeImmediately(savedState.theme);
     }
+    
+    // 立即应用排版设置
+    if (savedState.paraSpacing !== undefined || savedState.letterSpacing !== undefined) {
+      const newPrefs = {
+        paraSpacing: savedState.paraSpacing || defaultPrefs.paraSpacing,
+        letterSpacing: savedState.letterSpacing || defaultPrefs.letterSpacing
+      };
+      saveReadingPrefs(newPrefs);
+      applyTypography(newPrefs);
+      updateSettingsPanelUI(newPrefs);
+    }
+    
+  } catch (error) {
+    console.warn('Failed to preload book settings:', error);
   }
 }
 
@@ -568,22 +422,7 @@ function loadRemainingReadingState() {
     
     const savedState = JSON.parse(raw);
     
-    // 对于TXT文件，恢复章节索引
-    if (state.type === 'txt' && savedState.idx !== undefined) {
-      state.currentIndex = savedState.idx;
-      // 确保 txtReader 模块已经加载
-      if (window.txtReader && typeof window.txtReader.displayTxtChapter === 'function') {
-        window.txtReader.displayTxtChapter(savedState.idx);
-      } else {
-        // 如果模块还没加载，动态导入
-        import('./modules/txtReader.js').then(({ displayTxtChapter }) => {
-          displayTxtChapter(savedState.idx);
-        });
-      }
-      return; // TXT文件不需要处理滚动百分比
-    }
-    
-    // 恢复阅读进度百分比（适用于非TXT文件）
+    // 恢复阅读进度百分比
     if (savedState.readingPercentage !== undefined) {
       const scroller = document.querySelector('.main');
       if (scroller) {
@@ -818,33 +657,6 @@ function initSettingsPanel() {
       if (typeof saveCompleteReadingState === 'function') {
         saveCompleteReadingState();
       }
-    });
-  }
-
-  // 隔离书籍配置开关初始化与监听
-  const isolateToggle = document.getElementById('isolateBookConfigToggle');
-  if (isolateToggle) {
-    // 从localStorage加载设置
-    const isolateEnabled = localStorage.getItem('isolate_book_config') === 'true';
-    state.isolateBookConfig = isolateEnabled;
-    isolateToggle.checked = isolateEnabled;
-    
-    isolateToggle.addEventListener('change', () => {
-      state.isolateBookConfig = isolateToggle.checked;
-      localStorage.setItem('isolate_book_config', isolateToggle.checked.toString());
-      
-      // 如果有当前打开的书籍，立即保存当前状态
-      if (typeof saveCompleteReadingState === 'function') {
-        saveCompleteReadingState();
-      }
-      
-      // 提示用户重新打开书籍以应用新的设置模式
-      configManager.showMessage(
-        isolateToggle.checked 
-          ? '已开启书籍隔离模式，每本书将使用独立设置' 
-          : '已关闭书籍隔离模式，所有书籍将共享相同设置',
-        'info'
-      );
     });
   }
 
@@ -1420,10 +1232,6 @@ function setupEventListeners() {
     // 1. 首先加载用户配置中的基础设置（字体、主题）
     await preloadGlobalSettings();
     
-    // 1.5. 加载隔离书籍配置开关状态
-    const isolateEnabled = localStorage.getItem('isolate_book_config') === 'true';
-    state.isolateBookConfig = isolateEnabled;
-    
     // 2. 初始化各种功能模块
     initializeTheme();
     initReadingProgress();
@@ -1550,14 +1358,9 @@ function setupEventListeners() {
 
 // Make necessary functions available globally for HTML onclick handlers
 window.openBookFromServer = handleOpenBookFromServer;
-window.toggleTOC = toggleTOC;
 
 // 将简化后的函数暴露到全局作用域
 window.saveAllData = saveAllData;
-
-// 暴露模块到全局作用域以便其他函数调用
-import * as txtReader from './modules/txtReader.js';
-window.txtReader = txtReader;
 
 // Initialize application
 setupEventListeners();

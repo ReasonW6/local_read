@@ -37,8 +37,8 @@ export async function openTxt(text, fileName) {
   updateState({ chapters, txtPages });
   renderTOC();
   
-  // 显示第一章（实际的章节恢复将在 loadRemainingReadingState 中处理）
-  displayTxtChapter(0);
+  const saved = loadProgress(state.currentFileKey);
+  displayTxtChapter(saved?.idx || 0);
 }
 
 // Display specific TXT chapter
@@ -57,12 +57,6 @@ export function displayTxtChapter(idx) {
   const readerInner = DOM.readerInner();
   if (readerInner) {
     readerInner.innerHTML = `<h1>${titleText}</h1>${contentHtml}`;
-  }
-  
-  // 滚动到页面顶部
-  const mainContainer = document.querySelector('.main');
-  if (mainContainer) {
-    mainContainer.scrollTop = 0;
   }
   
   updateActiveTOC();
@@ -84,15 +78,6 @@ export function goToTxtChapter(index) {
   
   setNavigating(true); // 上锁
   displayTxtChapter(index);
-  
-  // 确保页面滚动到顶部（双重保险）
-  setTimeout(() => {
-    const mainContainer = document.querySelector('.main');
-    if (mainContainer) {
-      mainContainer.scrollTop = 0;
-    }
-  }, 50);
-  
   setNavigating(false); // TXT是同步操作，立即解锁
 }
 

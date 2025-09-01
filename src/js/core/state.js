@@ -14,8 +14,7 @@ export const state = {
   sidebarView: 'toc',
   isNavigating: false,
   lastReadBook: null, // 记录最后阅读的书籍
-  bookmarks: [], // 书签数组
-  isolateBookConfig: false // 是否隔离书籍配置（每本书独立设置）
+  bookmarks: [] // 书签数组
 };
 
 // State update functions

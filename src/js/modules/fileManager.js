@@ -2,24 +2,6 @@
 import { state, updateState } from '../core/state.js';
 import { DOM, CONFIG, getFileKey } from '../core/config.js';
 
-// Get book access history from localStorage
-function getBookAccessHistory() {
-  try {
-    const history = localStorage.getItem(CONFIG.STORAGE_KEYS.BOOK_ACCESS_HISTORY);
-    return history ? JSON.parse(history) : {};
-  } catch (error) {
-    console.warn('Failed to load book access history:', error);
-    return {};
-  }
-}
-
-// Update book access history
-function updateBookAccessHistory(bookPath) {
-  const history = getBookAccessHistory();
-  history[bookPath] = Date.now();
-  localStorage.setItem(CONFIG.STORAGE_KEYS.BOOK_ACCESS_HISTORY, JSON.stringify(history));
-}
-
 // Load bookshelf from server
 export async function loadBookshelf() {
   try {
@@ -53,66 +35,29 @@ export function renderBookshelf() {
     return;
   }
   
-  // 获取访问历史
-  const accessHistory = getBookAccessHistory();
-  
-  // 按访问历史排序，最近访问的在最前面
+  // 按最后阅读状态排序，最后阅读的书籍排在最前面
   const sortedBooks = [...state.bookshelf].sort((a, b) => {
-    const aTime = accessHistory[a.path] || 0;
-    const bTime = accessHistory[b.path] || 0;
-    return bTime - aTime; // 降序排列，最新的在前面
+    const aIsLastRead = state.lastReadBook && a.path === state.lastReadBook.path;
+    const bIsLastRead = state.lastReadBook && b.path === state.lastReadBook.path;
+    if (aIsLastRead && !bIsLastRead) return -1;
+    if (!aIsLastRead && bIsLastRead) return 1;
+    return 0;
   });
   
-  sortedBooks.forEach((book, index) => {
+  sortedBooks.forEach((book) => {
     const el = document.createElement('div');
     el.className = 'book-item';
     
-    // 检查是否是当前正在阅读的书籍
-    const isCurrentBook = state.currentFileKey === getFileKey(book.path);
-    const isRecentlyAccessed = accessHistory[book.path] && index < 5; // 前5本显示为最近访问
-    
-    if (isCurrentBook) {
-      el.classList.add('current-reading');
-    } else if (isRecentlyAccessed) {
-      el.classList.add('recently-accessed');
-    }
-    
-    // 格式化最后访问时间
-    let timeInfo = '';
-    if (accessHistory[book.path]) {
-      const accessTime = new Date(accessHistory[book.path]);
-      const now = new Date();
-      const timeDiff = now - accessTime;
-      
-      if (timeDiff < 60000) { // 1分钟内
-        timeInfo = '刚刚阅读';
-      } else if (timeDiff < 3600000) { // 1小时内
-        timeInfo = `${Math.floor(timeDiff / 60000)}分钟前`;
-      } else if (timeDiff < 86400000) { // 24小时内
-        timeInfo = `${Math.floor(timeDiff / 3600000)}小时前`;
-      } else if (timeDiff < 2592000000) { // 30天内
-        timeInfo = `${Math.floor(timeDiff / 86400000)}天前`;
-      } else {
-        timeInfo = accessTime.toLocaleDateString();
-      }
-    }
-    
-    // 创建书籍状态标识
-    let statusBadge = '';
-    if (isCurrentBook) {
-      statusBadge = '<span class="book-status current">正在阅读</span>';
-    } else if (index === 0 && accessHistory[book.path]) {
-      statusBadge = '<span class="book-status recent">最近阅读</span>';
+    // 检查是否是最后阅读的书籍
+    const isLastRead = state.lastReadBook && book.path === state.lastReadBook.path;
+    if (isLastRead) {
+      el.classList.add('last-read');
     }
     
     el.innerHTML = `
       <div style="flex:1">
-        <div class="book-title" style="font-weight: ${isCurrentBook ? '700' : '600'}; color: ${isCurrentBook ? 'var(--accent)' : 'inherit'}">${book.name}</div>
-        <div class="book-info">
-          <span class="book-path">${book.path}</span>
-          ${timeInfo ? `<span class="book-time">${timeInfo}</span>` : ''}
-        </div>
-        ${statusBadge}
+        <div class="${isLastRead ? 'book-title' : ''}" style="font-weight:600">${book.name}</div>
+        <div class="muted" style="font-size:12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${book.path}</div>
       </div>
     `;
     el.onclick = () => window.openBookFromServer(book);
@@ -128,15 +73,15 @@ export async function openBookFromServer(book) {
     const fileData = await response.arrayBuffer();
     updateState({ currentFileKey: getFileKey(book.path) });
     
-    // 记录访问历史
-    updateBookAccessHistory(book.path);
-    
-    // 更新最后阅读的书籍
-    updateState({ lastReadBook: book });
-    localStorage.setItem(CONFIG.STORAGE_KEYS.LAST_READ_BOOK, JSON.stringify(book));
-    
-    // 重新渲染书架以更新排序和状态显示
-    renderBookshelf();
+    // 检查是否是最近阅读的书籍，如果是则清除标识
+    const wasLastRead = state.lastReadBook && book.path === state.lastReadBook.path;
+    if (wasLastRead) {
+      // 清除最近阅读标识
+      updateState({ lastReadBook: null });
+      localStorage.removeItem(CONFIG.STORAGE_KEYS.LAST_READ_BOOK);
+      // 重新渲染书架以移除"最近阅读"标识
+      renderBookshelf();
+    }
     
     // Set book metadata
     const bookMeta = DOM.bookMeta();
