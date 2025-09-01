@@ -18,7 +18,7 @@ import {
   clearAllBookmarks, 
   loadBookmarks 
 } from './modules/bookmarkManager.js';
-import { toggleSidebar, closeSidebarIfBookshelf, closeSidebar, goToNextChapter, goToPreviousChapter } from './modules/uiController.js';
+import { toggleSidebar, toggleTOC, closeSidebarIfBookshelf, closeSidebar, goToNextChapter, goToPreviousChapter } from './modules/uiController.js';
 import { configManager } from './modules/configManager.js';
 
 /* ========== 设置面板与阅读偏好 ========== */
@@ -1509,6 +1509,7 @@ function setupEventListeners() {
 
 // Make necessary functions available globally for HTML onclick handlers
 window.openBookFromServer = handleOpenBookFromServer;
+window.toggleTOC = toggleTOC;
 
 // 将简化后的函数暴露到全局作用域
 window.saveAllData = saveAllData;

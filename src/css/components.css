@@ -205,6 +205,12 @@
   cursor: not-allowed; 
 }
 
+#chapter-nav .toc-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .bookshelf-actions {
   display: flex;
   gap: 8px;

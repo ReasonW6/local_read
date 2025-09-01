@@ -59,6 +59,12 @@ export function displayTxtChapter(idx) {
     readerInner.innerHTML = `<h1>${titleText}</h1>${contentHtml}`;
   }
   
+  // 滚动到页面顶部
+  const mainContainer = document.querySelector('.main');
+  if (mainContainer) {
+    mainContainer.scrollTop = 0;
+  }
+  
   updateActiveTOC();
   renderChapterNav();
   applyTxtFontSize();
@@ -78,6 +84,15 @@ export function goToTxtChapter(index) {
   
   setNavigating(true); // 上锁
   displayTxtChapter(index);
+  
+  // 确保页面滚动到顶部（双重保险）
+  setTimeout(() => {
+    const mainContainer = document.querySelector('.main');
+    if (mainContainer) {
+      mainContainer.scrollTop = 0;
+    }
+  }, 50);
+  
   setNavigating(false); // TXT是同步操作，立即解锁
 }
 
