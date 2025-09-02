@@ -30,7 +30,8 @@ export const CONFIG = {
   },
   STORAGE_KEYS: {
     BOOKMARKS: 'bookmarks',
-    LAST_READ_BOOK: 'lastReadBook'
+    LAST_READ_BOOK: 'lastReadBook',
+    READING_HISTORY: 'readingHistory'
   },
   THEMES: {
     LIGHT: 'light',

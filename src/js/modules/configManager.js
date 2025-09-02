@@ -23,6 +23,12 @@ export class ConfigManager {
       // 最后阅读的书籍
       lastReadBook: state.lastReadBook,
       
+      // 阅读历史记录
+      readingHistory: state.readingHistory || {},
+      
+      // 当前正在阅读的书籍
+      currentlyReading: state.currentlyReading,
+      
       // 所有书籍的阅读进度
       readingProgress: this.getAllReadingProgress(),
       
@@ -180,6 +186,15 @@ export class ConfigManager {
         localStorage.setItem(CONFIG.STORAGE_KEYS.LAST_READ_BOOK, JSON.stringify(config.lastReadBook));
       }
 
+      // 应用阅读历史记录
+      if (config.readingHistory) {
+        updateState({ readingHistory: config.readingHistory });
+        localStorage.setItem(CONFIG.STORAGE_KEYS.READING_HISTORY, JSON.stringify(config.readingHistory));
+      }
+
+      // 注意：不恢复 currentlyReading 状态，因为应用重启时用户并未实际在阅读
+      // currentlyReading 只应在用户真正打开书籍时设置
+
       // 应用阅读进度
       if (config.readingProgress) {
         Object.entries(config.readingProgress).forEach(([bookPath, progress]) => {
@@ -201,6 +216,14 @@ export class ConfigManager {
         const bookmarks = this.loadBookmarksForCurrentBook();
         updateState({ bookmarks });
         this.renderBookmarks();
+      }
+
+      // 重新渲染书架以显示更新的阅读历史
+      if (state.bookshelf && state.bookshelf.length > 0) {
+        // 导入renderBookshelf函数并重新渲染
+        import('./fileManager.js').then(({ renderBookshelf }) => {
+          renderBookshelf();
+        });
       }
 
       this.showMessage('所有配置已成功应用！', 'success');

@@ -2,6 +2,53 @@
 import { state, updateState } from '../core/state.js';
 import { DOM, CONFIG, getFileKey } from '../core/config.js';
 
+// Load reading history from localStorage
+export function loadReadingHistory() {
+  try {
+    const stored = localStorage.getItem(CONFIG.STORAGE_KEYS.READING_HISTORY);
+    if (stored) {
+      const readingHistory = JSON.parse(stored);
+      updateState({ readingHistory });
+    }
+  } catch (e) {
+    console.warn('Failed to load reading history:', e);
+    updateState({ readingHistory: {} });
+  }
+}
+
+// Save reading history to localStorage
+export function saveReadingHistory() {
+  try {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.READING_HISTORY, JSON.stringify(state.readingHistory));
+  } catch (e) {
+    console.warn('Failed to save reading history:', e);
+  }
+}
+
+// Update reading history for a book
+export function updateReadingHistory(book) {
+  const now = Date.now();
+  const history = { ...state.readingHistory };
+  
+  if (history[book.path]) {
+    history[book.path].lastReadTime = now;
+    history[book.path].readCount = (history[book.path].readCount || 0) + 1;
+  } else {
+    history[book.path] = {
+      name: book.name,
+      path: book.path,
+      lastReadTime: now,
+      readCount: 1
+    };
+  }
+  
+  updateState({ 
+    readingHistory: history,
+    currentlyReading: book.path
+  });
+  saveReadingHistory();
+}
+
 // Load bookshelf from server
 export async function loadBookshelf() {
   try {
@@ -9,6 +56,15 @@ export async function loadBookshelf() {
     if (!response.ok) throw new Error('Failed to fetch bookshelf');
     const books = await response.json();
     updateState({ bookshelf: books });
+    
+    // 加载阅读历史
+    loadReadingHistory();
+    
+    // 应用启动时清除当前正在阅读状态，避免显示错误的"正在阅读"标识
+    updateState({ currentlyReading: null });
+    
+    // 清理阅读历史中已不存在的书籍
+    cleanupReadingHistory(books);
     
     // 加载最后阅读的书籍信息
     loadLastReadBook();
@@ -35,34 +91,98 @@ export function renderBookshelf() {
     return;
   }
   
-  // 按最后阅读状态排序，最后阅读的书籍排在最前面
+  // 按阅读历史排序：当前正在阅读的书籍最前，然后按最后阅读时间排序，未读过的书籍最后
   const sortedBooks = [...state.bookshelf].sort((a, b) => {
-    const aIsLastRead = state.lastReadBook && a.path === state.lastReadBook.path;
-    const bIsLastRead = state.lastReadBook && b.path === state.lastReadBook.path;
-    if (aIsLastRead && !bIsLastRead) return -1;
-    if (!aIsLastRead && bIsLastRead) return 1;
-    return 0;
+    const aIsCurrentlyReading = state.currentlyReading === a.path;
+    const bIsCurrentlyReading = state.currentlyReading === b.path;
+    
+    // 当前正在阅读的书籍排在最前面（实际阅读中才会有这个状态）
+    if (aIsCurrentlyReading && !bIsCurrentlyReading) return -1;
+    if (!aIsCurrentlyReading && bIsCurrentlyReading) return 1;
+    
+    // 按阅读历史排序（最近阅读的在前）
+    const aHistory = state.readingHistory[a.path];
+    const bHistory = state.readingHistory[b.path];
+    
+    // 有阅读历史的排在无阅读历史的前面
+    if (aHistory && !bHistory) return -1;
+    if (!aHistory && bHistory) return 1;
+    
+    // 都有阅读历史，按最后阅读时间降序排列（最近阅读的在前）
+    if (aHistory && bHistory) {
+      return bHistory.lastReadTime - aHistory.lastReadTime;
+    }
+    
+    // 都没有阅读历史，按名称排序
+    return a.name.localeCompare(b.name, 'zh-CN');
   });
   
   sortedBooks.forEach((book) => {
     const el = document.createElement('div');
     el.className = 'book-item';
     
-    // 检查是否是最后阅读的书籍
+    // 检查书籍状态
+    const isCurrentlyReading = state.currentlyReading === book.path;
+    const history = state.readingHistory[book.path];
     const isLastRead = state.lastReadBook && book.path === state.lastReadBook.path;
-    if (isLastRead) {
+    
+    // 应用样式类
+    if (isCurrentlyReading) {
+      el.classList.add('currently-reading');
+    } else if (isLastRead) {
       el.classList.add('last-read');
+    } else if (history) {
+      el.classList.add('has-history');
+    }
+    
+    // 构建显示信息
+    let statusInfo = '';
+    if (isCurrentlyReading) {
+      statusInfo = '<span class="reading-status">正在阅读</span>';
+    } else if (isLastRead) {
+      statusInfo = '<span class="last-read-status">上次阅读</span>';
+    } else if (history) {
+      const timeAgo = formatTimeAgo(history.lastReadTime);
+      statusInfo = `<span class="reading-history">阅读于: ${timeAgo}</span>`;
     }
     
     el.innerHTML = `
       <div style="flex:1">
-        <div class="${isLastRead ? 'book-title' : ''}" style="font-weight:600">${book.name}</div>
-        <div class="muted" style="font-size:12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${book.path}</div>
+        <div class="book-title" style="font-weight:600">${book.name}</div>
+        <div class="muted book-path" style="font-size:12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${book.path}</div>
+        ${statusInfo ? `<div class="book-status" style="font-size:11px; margin-top:2px;">${statusInfo}</div>` : ''}
       </div>
     `;
     el.onclick = () => window.openBookFromServer(book);
     bookshelfList.appendChild(el);
   });
+}
+
+// 格式化时间为相对时间
+function formatTimeAgo(timestamp) {
+  const now = Date.now();
+  const diff = now - timestamp;
+  
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const week = 7 * day;
+  const month = 30 * day;
+  
+  if (diff < minute) {
+    return '刚刚';
+  } else if (diff < hour) {
+    return `${Math.floor(diff / minute)}分钟前`;
+  } else if (diff < day) {
+    return `${Math.floor(diff / hour)}小时前`;
+  } else if (diff < week) {
+    return `${Math.floor(diff / day)}天前`;
+  } else if (diff < month) {
+    return `${Math.floor(diff / week)}周前`;
+  } else {
+    const date = new Date(timestamp);
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+  }
 }
 
 // Load book from server
@@ -73,15 +193,19 @@ export async function openBookFromServer(book) {
     const fileData = await response.arrayBuffer();
     updateState({ currentFileKey: getFileKey(book.path) });
     
+    // 更新阅读历史
+    updateReadingHistory(book);
+    
     // 检查是否是最近阅读的书籍，如果是则清除标识
     const wasLastRead = state.lastReadBook && book.path === state.lastReadBook.path;
     if (wasLastRead) {
       // 清除最近阅读标识
       updateState({ lastReadBook: null });
       localStorage.removeItem(CONFIG.STORAGE_KEYS.LAST_READ_BOOK);
-      // 重新渲染书架以移除"最近阅读"标识
-      renderBookshelf();
     }
+    
+    // 重新渲染书架以显示最新的阅读状态
+    renderBookshelf();
     
     // Set book metadata
     const bookMeta = DOM.bookMeta();
@@ -168,4 +292,30 @@ export function loadProgress(key) {
   } catch (e) { 
     return null; 
   } 
+}
+
+// 清理阅读历史中已不存在的书籍
+function cleanupReadingHistory(currentBooks) {
+  const currentBookPaths = new Set(currentBooks.map(book => book.path));
+  const history = { ...state.readingHistory };
+  let hasChanges = false;
+  
+  // 移除不存在的书籍历史记录
+  Object.keys(history).forEach(path => {
+    if (!currentBookPaths.has(path)) {
+      delete history[path];
+      hasChanges = true;
+    }
+  });
+  
+  // 清理当前正在阅读的书籍标记
+  if (state.currentlyReading && !currentBookPaths.has(state.currentlyReading)) {
+    updateState({ currentlyReading: null });
+    hasChanges = true;
+  }
+  
+  if (hasChanges) {
+    updateState({ readingHistory: history });
+    saveReadingHistory();
+  }
 }

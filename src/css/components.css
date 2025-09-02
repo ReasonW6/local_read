@@ -263,6 +263,96 @@
   color: var(--accent);
 }
 
+/* Currently reading book styles */
+.book-item.currently-reading {
+  border: 2px solid #F44336;
+  background: linear-gradient(135deg, rgba(244, 67, 54, 0.15), transparent);
+  position: relative;
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.2);
+}
+
+.book-item.currently-reading::before {
+  content: "正在阅读";
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #F44336;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+  z-index: 1;
+  animation: reading-pulse 2s ease-in-out infinite;
+}
+
+@keyframes reading-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+[data-theme="dark"] .book-item.currently-reading::before {
+  color: #111;
+}
+
+.book-item.currently-reading .book-title {
+  font-weight: 700;
+  color: #F44336;
+}
+
+/* Books with reading history styles */
+.book-item.has-history {
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.05), transparent);
+}
+
+.book-item.has-history:hover {
+  border-color: rgba(var(--accent-rgb), 0.5);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.1), transparent);
+}
+
+/* Reading status text styles */
+.reading-status {
+  color: #F44336;
+  font-weight: 600;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reading-status::before {
+  content: "📖";
+  font-size: 10px;
+}
+
+.last-read-status {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.last-read-status::before {
+  content: "📚";
+  font-size: 10px;
+}
+
+.reading-history {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.book-path {
+  opacity: 0.7;
+}
+
+.book-status {
+  margin-top: 4px;
+}
+
 /* Bookmark styles */
 .bookmark-item {
   position: relative;

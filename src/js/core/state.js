@@ -14,6 +14,8 @@ export const state = {
   sidebarView: 'toc',
   isNavigating: false,
   lastReadBook: null, // 记录最后阅读的书籍
+  readingHistory: {}, // 记录每本书的阅读历史 {bookPath: {name, path, lastReadTime, readCount}}
+  currentlyReading: null, // 当前正在阅读的书籍路径
   bookmarks: [] // 书签数组
 };
 

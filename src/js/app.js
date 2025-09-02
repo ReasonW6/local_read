@@ -6,6 +6,7 @@ import {
   openBookFromServer, 
   readArrayBufferWithEncoding,
   saveLastReadBook,
+  loadReadingHistory,
   saveProgress,
   loadProgress 
 } from './modules/fileManager.js';
@@ -1341,6 +1342,10 @@ function setupEventListeners() {
       if (currentBook) {
         saveLastReadBook(currentBook);
       }
+      
+      // 清除"正在阅读"状态，下次启动时应显示为"上次阅读"
+      updateState({ currentlyReading: null });
+      
       // 自动保存所有数据（同步方式，避免页面关闭时丢失）
       try {
         const config = configManager.collectAllData();
