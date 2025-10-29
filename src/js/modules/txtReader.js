@@ -59,6 +59,12 @@ export function displayTxtChapter(idx) {
     readerInner.innerHTML = `<h1>${titleText}</h1>${contentHtml}`;
   }
   
+  // 滚动到页面顶部
+  const mainContainer = document.querySelector('.main');
+  if (mainContainer) {
+    mainContainer.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  
   updateActiveTOC();
   renderChapterNav();
   applyTxtFontSize();
