@@ -1,336 +1,102 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>本地电子书阅读器</title>
+  <title>书架 - 本地电子书阅读器</title>
+  <script>
+    (function() {
+      try {
+        var theme = localStorage.getItem('local_reader_theme');
+        if (theme === 'light' || theme === 'dark') {
+          document.documentElement.setAttribute('data-theme', theme);
+        }
+      } catch (error) {
+        console.warn('Theme preload failed', error);
+      }
+    })();
+  </script>
   
-  <!-- CSS Files -->
   <link rel="stylesheet" href="src/css/base.css">
-  <link rel="stylesheet" href="src/css/components.css">
   <link rel="stylesheet" href="src/css/responsive.css">
-  
-  <!-- External Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://unpkg.com/epubjs/dist/epub.min.js"></script>
+  <link rel="stylesheet" href="src/css/bookshelf.css">
 </head>
 <body data-theme="light">
-  <div class="reading-progress"><div class="reading-progress__bar" id="readingProgressBar"></div></div>
-  <div class="reading-progress__text" id="readingProgressText">0%</div>
+  <div class="bookshelf-page">
+    <header class="bookshelf-header">
+      <div class="brand">
+        <span class="brand-logo">📚</span>
+        <div>
+          <div class="brand-title">本地电子书阅读器</div>
+          <div class="brand-subtitle">整洁·高效·沉浸式阅读体验</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="search-group">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="bookSearchInput" type="search" placeholder="搜索书名或路径..." autocomplete="off" />
+        </div>
+        <div class="sort-group">
+          <label for="sortSelect">排序</label>
+          <select id="sortSelect">
+            <option value="recent">最近阅读</option>
+            <option value="title">书名</option>
+            <option value="added">添加时间</option>
+          </select>
+        </div>
+        <button id="themeToggle" class="ghost-btn" type="button">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          <span>夜间</span>
+        </button>
+        <button id="addBookBtn" class="primary-btn" type="button">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+          <span>添加书籍</span>
+        </button>
+      </div>
+    </header>
 
-  <div class="right-toolbar">
-    <button id="tocToggleBtn" title="目录">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-      <span>目录</span>
-    </button>
-    <button id="bookshelfBtn" title="书架">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-      <span>书架</span>
-    </button>
-    <button id="bookmarkListBtn" title="书签">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path></svg>
-      <span>书签</span>
-    </button>
-    <button id="fontIncreaseBtn" title="增大字体">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2"/><path d="M12 5v14"/><path d="M8 19h8"/><path d="M17 11h4"/><path d="M19 9v4"/></svg>
-      <span>增大</span>
-    </button>
-    <button id="fontDecreaseBtn" title="减小字体">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2"/><path d="M12 5v14"/><path d="M8 19h8"/><path d="M17 11h4"/></svg>
-      <span>减小</span>
-    </button>
-    <div class="toolbar-divider"></div>
-    <button id="themeToggle" title="切换日/夜间模式">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-      <span>夜间</span>
-    </button>
-    <div class="toolbar-divider"></div>
-    <button id="addBookmarkBtn" title="添加书签">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path><line x1="12" y1="7" x2="12" y2="13"></line><line x1="9" y1="10" x2="15" y2="10"></line></svg>
-      <span>书签</span>
-    </button>
-    <button id="saveProgressBtn" title="手动保存进度">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-      <span>保存</span>
-    </button>
-    <div class="toolbar-divider"></div>
-    <button id="settingsBtn" title="设置">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 5 15.4a1.65 1.65 0 0 0-1.51-1H3.4a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 5 8.49a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8.49 5c.26 0 .51-.05.74-.15A1.65 1.65 0 0 0 10.74 3.4V3.31a2 2 0 1 1 4 0v.09c0 .65.38 1.24.97 1.51.23.1.48.15.74.15.65 0 1.24-.38 1.51-.97l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.47.47-.6 1.18-.33 1.82.1.23.15.48.15.74 0 .65.38 1.24.97 1.51.23.1.48.15.74.15h.09a2 2 0 1 1 0 4h-.09c-.65 0-1.24.38-1.51.97Z"></path>
-      </svg>
-      <span>设置</span>
-    </button>
-  </div>
+    <section class="bookshelf-summary" id="bookshelfSummary"></section>
 
-  <div class="container">
-    <aside class="sidebar" id="sidebar">
-        <div class="bookshelf-view">
-            <div class="bookshelf">
-                <div style="font-weight:700">书架</div>
-                <div id="bookshelfList"></div>
-            </div>
-            <button id="refreshBookshelfBtn">刷新书架</button>
-        </div>
-        <div class="toc-view">
-            <div style="padding:12px;border-bottom:1px solid var(--border-color); flex-shrink: 0;">
-                <div style="font-weight:700">目录</div>
-            </div>
-            <div class="chapter-list-container">
-                <div id="toc" class="chapter-list"></div>
-            </div>
-        </div>
-        <div class="bookmark-view">
-            <div style="padding:12px;border-bottom:1px solid var(--border-color); flex-shrink: 0;">
-                <div style="font-weight:700; display: flex; justify-content: space-between; align-items: center;">
-                    <span>书签</span>
-                    <button id="clearAllBookmarksBtn" style="background: none; border: 1px solid var(--border-color); color: var(--muted); padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer;" title="清空所有书签">清空</button>
-                </div>
-            </div>
-            <div class="chapter-list-container">
-                <div id="bookmarkList" class="chapter-list"></div>
-            </div>
-        </div>
-    </aside>
-
-    <main class="main">
-      <div id="reader" class="reader">
-        <div id="book-meta"></div>
-        <div id="readerInner">
-          <h1>欢迎使用本地电子书阅读器</h1>
-          <p class="muted">请先将 .epub 或 .txt 文件放入项目根目录的 'books' 文件夹中，然后点击右侧的 "书架" 按钮。</p>
-        </div>
-        <div id="chapter-nav"></div>
-        <div id="save-indicator">已保存</div>
+    <main class="bookshelf-main">
+      <div id="bookshelfGrid" class="bookshelf-grid" aria-live="polite"></div>
+      <div id="bookshelfEmpty" class="bookshelf-empty" hidden>
+        <div class="empty-icon">📥</div>
+        <h2>书架空空如也</h2>
+        <p>将 .epub、.txt 或 .pdf 文件拖拽到此处，或点击上方的“添加书籍”按钮。</p>
+        <button id="emptyAddBtn" class="primary-btn" type="button">添加第一本书</button>
       </div>
     </main>
+
+    <footer class="bookshelf-footer">
+      <div>支持 EPUB / TXT / PDF · 数据保存在本地，放心使用</div>
+      <div class="footer-links">
+        <a href="reader.html">进入阅读页</a>
+        <a href="user-data/" target="_blank" rel="noopener">查看配置文件</a>
+      </div>
+    </footer>
   </div>
 
-  <!-- Settings modal -->
-  <div id="settingsMask" class="settings-mask">
-    <div id="settingsModal" class="settings-modal">
-      <div class="settings-header">
-        <h2 class="settings-title">阅读设置</h2>
-        <button id="settingsClose" class="settings-close">×</button>
-      </div>
-      
-      <!-- Settings Navigation -->
-      <div class="settings-nav">
-        <button class="settings-nav-item active" data-category="reading">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-          </svg>
-          <span>阅读体验</span>
-        </button>
-        <button class="settings-nav-item" data-category="shortcuts">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-            <line x1="8" y1="21" x2="16" y2="21"></line>
-            <line x1="12" y1="17" x2="12" y2="21"></line>
-          </svg>
-          <span>快捷键</span>
-        </button>
-        <button class="settings-nav-item" data-category="advanced">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 5 15.4a1.65 1.65 0 0 0-1.51-1H3.4a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 5 8.49a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8.49 5c.26 0 .51-.05.74-.15A1.65 1.65 0 0 0 10.74 3.4V3.31a2 2 0 1 1 4 0v.09c0 .65.38 1.24.97 1.51.23.1.48.15.74.15.65 0 1.24-.38 1.51-.97l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.47.47-.6 1.18-.33 1.82.1.23.15.48.15.74 0 .65.38 1.24.97 1.51.23.1.48.15.74.15h.09a2 2 0 1 1 0 4h-.09c-.65 0-1.24.38-1.51.97Z"></path>
-          </svg>
-          <span>高级功能</span>
-        </button>
-      </div>
-      
-      <div class="settings-content">
-        <!-- 阅读体验设置 -->
-        <div class="settings-category" id="category-reading">
-          <div class="settings-category-header">
-            <svg class="settings-category-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-            </svg>
-            <h3>阅读体验</h3>
-          </div>
-          
-          <div class="settings-section">
-            <div class="settings-subsection">
-              <h4>排版调整</h4>
-              <div class="settings-row">
-                <span class="settings-label">段落间距</span>
-                <div class="settings-control">
-                  <input type="range" id="paraSpacingInput" class="settings-slider" min="0.6" max="2" step="0.05" value="1">
-                  <span id="paraSpacingVal" class="settings-value">1</span>
-                </div>
-              </div>
-              <div class="settings-row">
-                <span class="settings-label">字间距</span>
-                <div class="settings-control">
-                  <input type="range" id="letterSpacingInput" class="settings-slider" min="0" max="1.5" step="0.05" value="0.2">
-                  <span id="letterSpacingVal" class="settings-value">0.2px</span>
-                </div>
-              </div>
-            </div>
-            
-            <div class="settings-subsection">
-              <h4>显示设置</h4>
-              <div class="settings-row">
-                <span class="settings-label">当前字体大小</span>
-                <div class="settings-control">
-                  <span id="currentFontSize" class="settings-info">18px</span>
-                  <div class="settings-button-group">
-                    <button class="settings-mini-btn" onclick="window.changeFontSize && window.changeFontSize(-1)">-</button>
-                    <button class="settings-mini-btn" onclick="window.changeFontSize && window.changeFontSize(1)">+</button>
-                  </div>
-                </div>
-              </div>
-              <div class="settings-row">
-                <span class="settings-label">当前主题</span>
-                <div class="settings-control">
-                  <span id="currentTheme" class="settings-info">日间模式</span>
-                  <button class="settings-mini-btn" onclick="window.toggleTheme && window.toggleTheme()">切换</button>
-                </div>
-              </div>
-              <div class="settings-row">
-                <span class="settings-label">顶部进度条</span>
-                <div class="settings-control">
-                  <label class="toggle-switch">
-                    <input type="checkbox" id="progressBarToggle" checked />
-                    <span class="toggle-slider"></span>
-                  </label>
-                </div>
-              </div>
-            </div>
-            
-            <div class="settings-actions">
-              <button id="resetReadingPrefsBtn" class="settings-reset-btn">恢复默认设置</button>
-            </div>
-          </div>
-        </div>
-        
-        <!-- 操作指南 -->
-        <div class="settings-category" id="category-shortcuts" style="display: none;">
-          <div class="settings-category-header">
-            <svg class="settings-category-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-              <line x1="8" y1="21" x2="16" y2="21"></line>
-              <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>
-            <h3>键盘快捷键</h3>
-          </div>
-          
-          <div class="settings-section">
-            <div class="keyboard-shortcuts">
-              <div class="shortcut-category">
-                <h5>导航操作</h5>
-                <div class="shortcut-grid">
-                  <div class="shortcut-item">
-                    <span>上一章</span>
-                    <span class="shortcut-key">←</span>
-                  </div>
-                  <div class="shortcut-item">
-                    <span>下一章</span>
-                    <span class="shortcut-key">→</span>
-                  </div>
-                  <div class="shortcut-item">
-                    <span>快速翻页</span>
-                    <span class="shortcut-key">空格</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="shortcut-category">
-                <h5>阅读调整</h5>
-                <div class="shortcut-grid">
-                  <div class="shortcut-item">
-                    <span>增大字号</span>
-                    <span class="shortcut-key">+</span>
-                  </div>
-                  <div class="shortcut-item">
-                    <span>减小字号</span>
-                    <span class="shortcut-key">-</span>
-                  </div>
-                  <div class="shortcut-item">
-                    <span>切换主题</span>
-                    <span class="shortcut-key">T</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="shortcut-category">
-                <h5>书签与保存</h5>
-                <div class="shortcut-grid">
-                  <div class="shortcut-item">
-                    <span>添加书签</span>
-                    <span class="shortcut-key">B</span>
-                  </div>
-                  <div class="shortcut-item">
-                    <span>保存进度</span>
-                    <span class="shortcut-key">S</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- 功能预览 -->
-        <div class="settings-category" id="category-advanced" style="display: none;">
-          <div class="settings-category-header">
-            <svg class="settings-category-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 5 15.4a1.65 1.65 0 0 0-1.51-1H3.4a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 5 8.49a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8.49 5c.26 0 .51-.05.74-.15A1.65 1.65 0 0 0 10.74 3.4V3.31a2 2 0 1 1 4 0v.09c0 .65.38 1.24.97 1.51.23.1.48.15.74.15.65 0 1.24-.38 1.51-.97l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.47.47-.6 1.18-.33 1.82.1.23.15.48.15.74 0 .65.38 1.24.97 1.51.23.1.48.15.74.15h.09a2 2 0 1 1 0 4h-.09c-.65 0-1.24.38-1.51.97Z"></path>
-            </svg>
-            <h3>高级功能</h3>
-          </div>
-          
-          <div class="settings-section">
-            <div class="feature-preview">
-              <div class="feature-category">
-                <h5>📖 排版增强</h5>
-                <ul class="feature-list">
-                  <li>行距调整</li>
-                  <li>两端对齐</li>
-                  <li>页边距设置</li>
-                  <li>首行缩进控制</li>
-                </ul>
-              </div>
-              
-              <div class="feature-category">
-                <h5>🎨 主题定制</h5>
-                <ul class="feature-list">
-                  <li>自定义主题色</li>
-                  <li>护眼模式</li>
-                  <li>背景纹理</li>
-                  <li>字体选择</li>
-                </ul>
-              </div>
-              
-              <div class="feature-category">
-                <h5>📊 阅读统计</h5>
-                <ul class="feature-list">
-                  <li>阅读时长统计</li>
-                  <li>阅读进度分析</li>
-                  <li>阅读习惯报告</li>
-                  <li>目标设定</li>
-                </ul>
-              </div>
-              
-              <div class="feature-category">
-                <h5>🔧 更多工具</h5>
-                <ul class="feature-list">
-                  <li>笔记标注</li>
-                  <li>全文搜索</li>
-                  <li>导出功能</li>
-                  <li>云端同步</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <input id="bookFileInput" type="file" accept=".epub,.txt,.pdf" multiple hidden />
 
-  <!-- Main Application Script -->
-  <script type="module" src="src/js/app.js"></script>
+  <template id="bookCardTemplate">
+    <article class="book-card">
+      <div class="book-cover">
+        <img src="" alt="" loading="lazy" />
+        <div class="cover-placeholder" aria-hidden="true"></div>
+        <button class="delete-btn" type="button" title="删除书籍">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M5 6l1-3h12l1 3"></path></svg>
+        </button>
+      </div>
+      <div class="book-info">
+        <div class="book-title"></div>
+        <div class="book-meta"></div>
+        <div class="book-tags"></div>
+      </div>
+    </article>
+  </template>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script type="module" src="src/js/bookshelfApp.js"></script>
 </body>
 </html>

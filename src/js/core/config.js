@@ -26,7 +26,9 @@ export const CONFIG = {
   MAX_FONT_SIZE: 32,
   SERVER_API: {
     BOOKSHELF: '/api/bookshelf',
-    BOOK: '/api/book'
+    BOOK: '/api/book',
+    BOOK_COVER: '/api/book-cover',
+    UPLOAD: '/api/upload'
   },
   STORAGE_KEYS: {
     BOOKMARKS: 'bookmarks',

@@ -22,6 +22,33 @@ import {
 import { toggleSidebar, closeSidebarIfBookshelf, closeSidebar, goToNextChapter, goToPreviousChapter } from './modules/uiController.js';
 import { configManager } from './modules/configManager.js';
 
+const THEME_STORAGE_KEY = 'local_reader_theme';
+const queryParams = new URLSearchParams(window.location.search);
+const queryTheme = queryParams.get('theme');
+const queryPath = queryParams.get('path');
+const queryName = queryParams.get('name');
+const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+
+const initialTheme = (queryTheme === CONFIG.THEMES.DARK || queryTheme === CONFIG.THEMES.LIGHT)
+  ? queryTheme
+  : (storedTheme === CONFIG.THEMES.DARK || storedTheme === CONFIG.THEMES.LIGHT)
+    ? storedTheme
+    : null;
+
+let pendingQueryBook = queryPath ? {
+  path: queryPath,
+  name: queryName || null
+} : null;
+
+if (initialTheme && initialTheme !== state.theme) {
+  state.theme = initialTheme;
+  document.body.dataset.theme = initialTheme;
+}
+
+if (queryTheme === CONFIG.THEMES.DARK || queryTheme === CONFIG.THEMES.LIGHT) {
+  localStorage.setItem(THEME_STORAGE_KEY, queryTheme);
+}
+
 /* ========== 设置面板与阅读偏好 ========== */
 const PREFS_KEY = 'reader_prefs_v1';
 const defaultPrefs = { paraSpacing: 1, letterSpacing: 0.2 };
@@ -187,6 +214,14 @@ function updateSettingsPanelUI(prefs) {
   if (letterVal) letterVal.textContent = `${prefs.letterSpacing}px`;
 }
 
+function deriveBookNameFromPath(path) {
+  if (!path) return '未知书籍';
+  const normalized = path.replace(/\\/g, '/');
+  const segments = normalized.split('/').filter(Boolean);
+  const lastSegment = segments[segments.length - 1];
+  return lastSegment || normalized || '未知书籍';
+}
+
 // 增强的一键保存所有数据功能
 async function saveAllData() {
   try {
@@ -253,8 +288,14 @@ async function preloadGlobalSettings() {
         }
       }
       
-      // 立即应用主题设置
-      if (config.settings && config.settings.theme) {
+      const overrideTheme = localStorage.getItem(THEME_STORAGE_KEY);
+      const normalizedOverride = (overrideTheme === CONFIG.THEMES.DARK || overrideTheme === CONFIG.THEMES.LIGHT) ? overrideTheme : null;
+
+      // 立即应用主题设置，优先使用本地偏好
+      if (normalizedOverride) {
+        state.theme = normalizedOverride;
+        document.body.setAttribute('data-theme', normalizedOverride);
+      } else if (config.settings && config.settings.theme) {
         state.theme = config.settings.theme;
         document.body.setAttribute('data-theme', config.settings.theme);
       }
@@ -447,6 +488,31 @@ async function handleOpenBookFromServer(book) {
     await openBook(result.book, result.fileData);
   } catch (error) {
     // Error is already handled in openBookFromServer
+  }
+}
+
+async function openBookFromQueryIfNeeded(booksFromLoad) {
+  if (!pendingQueryBook || !pendingQueryBook.path) {
+    pendingQueryBook = null;
+    return;
+  }
+
+  const allBooks = Array.isArray(booksFromLoad) && booksFromLoad.length > 0
+    ? booksFromLoad
+    : Array.isArray(state.bookshelf) ? state.bookshelf : [];
+  const matched = allBooks.find(item => item.path === pendingQueryBook.path);
+
+  const targetBook = matched || {
+    path: pendingQueryBook.path,
+    name: pendingQueryBook.name || deriveBookNameFromPath(pendingQueryBook.path)
+  };
+
+  try {
+    await handleOpenBookFromServer(targetBook);
+  } catch (error) {
+    console.warn('自动打开书籍失败:', error);
+  } finally {
+    pendingQueryBook = null;
   }
 }
 
@@ -1242,13 +1308,20 @@ function setupEventListeners() {
     applyTypography(getReadingPrefs());
 
     // 3. 加载书架
-    await loadBookshelf().then(() => {
+    let booksFromLoad;
+    try {
+      booksFromLoad = await loadBookshelf();
       toggleSidebar(CONFIG.SIDEBAR_VIEWS.BOOKSHELF);
       requestAnimationFrame(updateReadingProgress);
-    });
+    } catch (error) {
+      // loadBookshelf 内部已处理错误提示
+    }
     
     // 4. 加载其他用户配置（书签、阅读进度等）
     await autoLoadUserConfig();
+
+    // 5. 若通过URL携带书籍路径，自动打开对应书籍
+    await openBookFromQueryIfNeeded(booksFromLoad);
 
     const readerInnerEl = DOM.readerInner && DOM.readerInner();
     if (readerInnerEl) {
