@@ -124,7 +124,7 @@ export function renderBookshelf() {
     // 检查书籍状态
     const isCurrentlyReading = state.currentlyReading === book.path;
     const history = state.readingHistory[book.path];
-    const isLastRead = state.lastReadBook && book.path === state.lastReadBook.path;
+    const isLastRead = !isCurrentlyReading && state.lastReadBook && book.path === state.lastReadBook.path;
     
     // 应用样式类
     if (isCurrentlyReading) {
@@ -138,12 +138,12 @@ export function renderBookshelf() {
     // 构建显示信息
     let statusInfo = '';
     if (isCurrentlyReading) {
-      statusInfo = '<span class="reading-status">正在阅读</span>';
+      statusInfo = '<span class="reading-status">📖 正在阅读</span>';
     } else if (isLastRead) {
-      statusInfo = '<span class="last-read-status">上次阅读</span>';
+      statusInfo = '<span class="last-read-status">📚 上次阅读</span>';
     } else if (history) {
       const timeAgo = formatTimeAgo(history.lastReadTime);
-      statusInfo = `<span class="reading-history">阅读于: ${timeAgo}</span>`;
+      statusInfo = `<span class="reading-history">📖 ${timeAgo}</span>`;
     }
     
     el.innerHTML = `
@@ -196,13 +196,9 @@ export async function openBookFromServer(book) {
     // 更新阅读历史
     updateReadingHistory(book);
     
-    // 检查是否是最近阅读的书籍，如果是则清除标识
-    const wasLastRead = state.lastReadBook && book.path === state.lastReadBook.path;
-    if (wasLastRead) {
-      // 清除最近阅读标识
-      updateState({ lastReadBook: null });
-      localStorage.removeItem(CONFIG.STORAGE_KEYS.LAST_READ_BOOK);
-    }
+    // 清除"上次阅读"标识，因为现在有新的正在阅读的书籍了
+    updateState({ lastReadBook: null });
+    localStorage.removeItem(CONFIG.STORAGE_KEYS.LAST_READ_BOOK);
     
     // 重新渲染书架以显示最新的阅读状态
     renderBookshelf();
