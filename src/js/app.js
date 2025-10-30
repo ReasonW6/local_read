@@ -65,7 +65,7 @@ function computeVerticalPadding(horizontalPadding) {
   if (!Number.isFinite(horizontal)) {
     return Math.round(defaultPrefs.pagePadding * 0.75);
   }
-  return Math.max(20, Math.round(horizontal * 0.75));
+  return Math.max(8, Math.round(horizontal * 0.75));
 }
 
 function normalizePrefs(raw = {}) {
@@ -78,11 +78,11 @@ function normalizePrefs(raw = {}) {
     return fallback;
   };
 
-  const paraSpacing = clamp(merged.paraSpacing, 0.4, 3, defaultPrefs.paraSpacing);
-  const letterSpacing = clamp(merged.letterSpacing, 0, 3, defaultPrefs.letterSpacing);
-  const lineHeight = clamp(merged.lineHeight, 1.2, 2.8, defaultPrefs.lineHeight);
-  const pageWidth = Math.round(clamp(merged.pageWidth, 480, 1400, defaultPrefs.pageWidth));
-  const pagePadding = Math.round(clamp(merged.pagePadding, 16, 120, defaultPrefs.pagePadding));
+  const paraSpacing = clamp(merged.paraSpacing, 0.2, 4, defaultPrefs.paraSpacing);
+  const letterSpacing = clamp(merged.letterSpacing, 0, 5, defaultPrefs.letterSpacing);
+  const lineHeight = clamp(merged.lineHeight, 1.0, 3.5, defaultPrefs.lineHeight);
+  const pageWidth = Math.round(clamp(merged.pageWidth, 400, 2000, defaultPrefs.pageWidth));
+  const pagePadding = Math.round(clamp(merged.pagePadding, 10, 150, defaultPrefs.pagePadding));
   const progressBarEnabled = merged.progressBarEnabled !== false;
 
   return { paraSpacing, letterSpacing, lineHeight, pageWidth, pagePadding, progressBarEnabled };

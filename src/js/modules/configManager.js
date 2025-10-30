@@ -16,7 +16,7 @@ function computeVerticalPadding(horizontalPadding) {
   if (!Number.isFinite(horizontal)) {
     return Math.round(defaultReadingPrefs.pagePadding * 0.75);
   }
-  return Math.max(20, Math.round(horizontal * 0.75));
+  return Math.max(8, Math.round(horizontal * 0.75));
 }
 
 function normalizeReadingPrefs(raw = {}) {
@@ -30,11 +30,11 @@ function normalizeReadingPrefs(raw = {}) {
   };
 
   return {
-    paraSpacing: clamp(merged.paraSpacing, 0.4, 3, defaultReadingPrefs.paraSpacing),
-    letterSpacing: clamp(merged.letterSpacing, 0, 3, defaultReadingPrefs.letterSpacing),
-    lineHeight: clamp(merged.lineHeight, 1.2, 2.8, defaultReadingPrefs.lineHeight),
-  pageWidth: Math.round(clamp(merged.pageWidth, 480, 1400, defaultReadingPrefs.pageWidth)),
-  pagePadding: Math.round(clamp(merged.pagePadding, 16, 120, defaultReadingPrefs.pagePadding)),
+    paraSpacing: clamp(merged.paraSpacing, 0.2, 4, defaultReadingPrefs.paraSpacing),
+    letterSpacing: clamp(merged.letterSpacing, 0, 5, defaultReadingPrefs.letterSpacing),
+    lineHeight: clamp(merged.lineHeight, 1.0, 3.5, defaultReadingPrefs.lineHeight),
+  pageWidth: Math.round(clamp(merged.pageWidth, 400, 2000, defaultReadingPrefs.pageWidth)),
+  pagePadding: Math.round(clamp(merged.pagePadding, 10, 150, defaultReadingPrefs.pagePadding)),
     progressBarEnabled: merged.progressBarEnabled !== false
   };
 }
