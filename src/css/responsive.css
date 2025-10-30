@@ -19,11 +19,12 @@
   } 
   
   .main { 
-    padding: 0 15px; 
+    padding: 0; 
   } 
   
   .reader{ 
-    min-height: 98%; 
+    min-height: 98%;
+    max-width: 100%;
   } 
   
   .right-toolbar { 

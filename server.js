@@ -3,6 +3,7 @@ const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const AdmZip = require('adm-zip');
 const app = express();
 const port = 3000;
 
@@ -61,6 +62,90 @@ const upload = multer({
 });
 
 // 递归地读取目录中的所有书籍文件
+const IMAGE_MIME_TYPES = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp'
+};
+
+const coverCache = new Map();
+
+const normalizeRelativePath = (p = '') => p.split(path.sep).join('/');
+
+const resolveBookPath = (relativePath = '') => {
+  const normalized = path.normalize(relativePath).replace(/^([\.\\/])+/, '');
+  const resolved = path.resolve(booksDirectory, normalized);
+  const booksRoot = path.resolve(booksDirectory);
+  if (!resolved.toLowerCase().startsWith(booksRoot.toLowerCase())) {
+    throw new Error('Invalid book path');
+  }
+  return resolved;
+};
+
+const cleanupEmptyFolders = (startPath) => {
+  let current = path.dirname(startPath);
+  const booksRoot = path.resolve(booksDirectory);
+  while (current.toLowerCase().startsWith(booksRoot.toLowerCase()) && current !== booksRoot) {
+    try {
+      const remaining = fs.readdirSync(current);
+      if (remaining.length === 0) {
+        fs.rmdirSync(current);
+        current = path.dirname(current);
+      } else {
+        break;
+      }
+    } catch (error) {
+      break;
+    }
+  }
+};
+
+const extractEpubCover = (absolutePath) => {
+  try {
+    const stats = fs.statSync(absolutePath);
+    const cacheKey = absolutePath;
+    const cached = coverCache.get(cacheKey);
+    if (cached && cached.mtime === stats.mtimeMs) {
+      return cached.data;
+    }
+
+    const zip = new AdmZip(absolutePath);
+    const entries = zip.getEntries();
+    if (!entries || entries.length === 0) return null;
+
+    const imageEntries = entries.filter(entry => {
+      if (entry.isDirectory) return false;
+      const ext = path.extname(entry.entryName).toLowerCase();
+      return Object.prototype.hasOwnProperty.call(IMAGE_MIME_TYPES, ext);
+    });
+
+    if (imageEntries.length === 0) return null;
+
+    let coverEntry = imageEntries.find(entry => /cover/i.test(path.basename(entry.entryName)));
+    if (!coverEntry) {
+      coverEntry = imageEntries[0];
+    }
+
+    if (!coverEntry) return null;
+
+    const data = coverEntry.getData();
+    if (!data) return null;
+
+    const ext = path.extname(coverEntry.entryName).toLowerCase();
+    const mime = IMAGE_MIME_TYPES[ext] || 'image/jpeg';
+    const base64 = data.toString('base64');
+    const dataUrl = `data:${mime};base64,${base64}`;
+
+    coverCache.set(cacheKey, { mtime: stats.mtimeMs, data: dataUrl });
+    return dataUrl;
+  } catch (error) {
+    console.warn('Failed to extract EPUB cover:', error.message);
+    return null;
+  }
+};
+
 const findBooks = (dir, fileList = [], parentDir = '') => {
   const files = fs.readdirSync(dir);
 
@@ -72,9 +157,16 @@ const findBooks = (dir, fileList = [], parentDir = '') => {
     if (fileStat.isDirectory()) {
       findBooks(filePath, fileList, relativePath);
     } else if (file.toLowerCase().endsWith('.epub') || file.toLowerCase().endsWith('.txt') || file.toLowerCase().endsWith('.pdf')) {
+      const ext = path.extname(file).toLowerCase();
+      const normalizedPath = normalizeRelativePath(relativePath);
       fileList.push({
         name: file,
-        path: relativePath, // 使用相对路径作为唯一标识
+        path: normalizedPath,
+        extension: ext,
+        size: fileStat.size,
+        addedAt: fileStat.birthtimeMs || fileStat.ctimeMs,
+        modifiedAt: fileStat.mtimeMs,
+        coverAvailable: ext === '.epub'
       });
     }
   });
@@ -93,6 +185,32 @@ app.get('/api/bookshelf', (req, res) => {
   } catch (error) {
     console.error('Error reading bookshelf:', error);
     res.status(500).json({ error: 'Failed to read bookshelf directory.' });
+  }
+});
+
+// API: 获取书籍封面
+app.get('/api/book-cover', (req, res) => {
+  try {
+    const relPath = req.query.path;
+    if (!relPath) {
+      return res.status(400).json({ error: '缺少书籍路径' });
+    }
+
+    const absolutePath = resolveBookPath(relPath);
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(404).json({ error: '书籍不存在' });
+    }
+
+    const ext = path.extname(absolutePath).toLowerCase();
+    if (ext !== '.epub') {
+      return res.json({ success: true, cover: null });
+    }
+
+    const cover = extractEpubCover(absolutePath);
+    res.json({ success: true, cover });
+  } catch (error) {
+    console.error('Error extracting cover:', error);
+    res.status(500).json({ error: '封面提取失败: ' + error.message });
   }
 });
 
@@ -267,15 +385,41 @@ app.get('/api/book', (req, res) => {
   }
 
   // 安全性检查：确保请求的文件路径在 `books` 目录内
-  const safePath = path.join(booksDirectory, bookPath);
-  if (safePath.indexOf(booksDirectory) !== 0) {
-      return res.status(403).send('Forbidden.');
+  let safePath;
+  try {
+    safePath = resolveBookPath(bookPath);
+  } catch (error) {
+    return res.status(403).send('Forbidden.');
   }
 
   if (fs.existsSync(safePath)) {
     res.sendFile(safePath);
   } else {
     res.status(404).send('Book not found.');
+  }
+});
+
+// API: 删除书籍
+app.delete('/api/book', (req, res) => {
+  try {
+    const relPath = req.query.path;
+    if (!relPath) {
+      return res.status(400).json({ error: '缺少书籍路径' });
+    }
+
+    const absolutePath = resolveBookPath(relPath);
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(404).json({ error: '书籍不存在' });
+    }
+
+    fs.unlinkSync(absolutePath);
+    cleanupEmptyFolders(absolutePath);
+    coverCache.delete(absolutePath);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting book:', error);
+    res.status(500).json({ error: '删除书籍失败: ' + error.message });
   }
 });
 

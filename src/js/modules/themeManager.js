@@ -4,6 +4,8 @@ import { DOM, CONFIG } from '../core/config.js';
 import { applyFontSize } from './epubReader.js';
 import { applyTxtFontSize } from './txtReader.js';
 
+const THEME_STORAGE_KEY = 'local_reader_theme';
+
 // Toggle theme between light and dark
 export function toggleTheme() {
   const newTheme = (state.theme === CONFIG.THEMES.LIGHT) ? CONFIG.THEMES.DARK : CONFIG.THEMES.LIGHT;
@@ -11,6 +13,8 @@ export function toggleTheme() {
   
   // Update body theme attribute
   document.body.dataset.theme = newTheme;
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem(THEME_STORAGE_KEY, newTheme);
   
   // Update theme toggle button text
   const themeToggle = DOM.themeToggle();
@@ -67,6 +71,8 @@ export function setTheme(theme) {
   
   // Update body theme attribute
   document.body.dataset.theme = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem(THEME_STORAGE_KEY, theme);
   
   // Update theme toggle button text
   const themeToggle = DOM.themeToggle();
@@ -90,6 +96,7 @@ export function setTheme(theme) {
 export function initializeTheme() {
   // Set initial theme
   document.body.dataset.theme = state.theme;
+  document.documentElement.setAttribute('data-theme', state.theme);
   
   // Update theme toggle button text
   const themeToggle = DOM.themeToggle();

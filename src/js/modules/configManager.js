@@ -2,6 +2,53 @@
 import { state, updateState } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
 
+const defaultReadingPrefs = {
+  paraSpacing: 1,
+  letterSpacing: 0.2,
+  lineHeight: 1.8,
+  pageWidth: 800,
+  pagePadding: 40,
+  progressBarEnabled: true
+};
+
+function computeVerticalPadding(horizontalPadding) {
+  const horizontal = Number(horizontalPadding);
+  if (!Number.isFinite(horizontal)) {
+    return Math.round(defaultReadingPrefs.pagePadding * 0.75);
+  }
+  return Math.max(8, Math.round(horizontal * 0.75));
+}
+
+function normalizeReadingPrefs(raw = {}) {
+  const merged = { ...defaultReadingPrefs, ...raw };
+  const clamp = (value, min, max, fallback) => {
+    const num = Number(value);
+    if (Number.isFinite(num)) {
+      return Math.min(Math.max(num, min), max);
+    }
+    return fallback;
+  };
+
+  return {
+    paraSpacing: clamp(merged.paraSpacing, 0.2, 4, defaultReadingPrefs.paraSpacing),
+    letterSpacing: clamp(merged.letterSpacing, 0, 5, defaultReadingPrefs.letterSpacing),
+    lineHeight: clamp(merged.lineHeight, 1.0, 3.5, defaultReadingPrefs.lineHeight),
+  pageWidth: Math.round(clamp(merged.pageWidth, 400, 2000, defaultReadingPrefs.pageWidth)),
+  pagePadding: Math.round(clamp(merged.pagePadding, 10, 150, defaultReadingPrefs.pagePadding)),
+    progressBarEnabled: merged.progressBarEnabled !== false
+  };
+}
+
+function applyProgressBarDisplay(enabled) {
+  const display = enabled ? '' : 'none';
+  Array.from(document.querySelectorAll('#readingProgress, .reading-progress, .top-progress')).forEach(el => {
+    el.style.display = display;
+  });
+  Array.from(document.querySelectorAll('#readingProgressBar, .reading-progress__bar, .progress-bar')).forEach(el => {
+    el.style.display = display;
+  });
+}
+
 // 配置管理器
 export class ConfigManager {
   constructor() {
@@ -52,9 +99,10 @@ export class ConfigManager {
   getReadingPrefs() {
     try {
       const raw = localStorage.getItem('reader_prefs_v1');
-      return raw ? JSON.parse(raw) : { paraSpacing: 1, letterSpacing: 0.2 };
+      if (!raw) return normalizeReadingPrefs();
+      return normalizeReadingPrefs(JSON.parse(raw));
     } catch (e) {
-      return { paraSpacing: 1, letterSpacing: 0.2 };
+      return normalizeReadingPrefs();
     }
   }
 
@@ -176,8 +224,9 @@ export class ConfigManager {
 
       // 应用阅读偏好
       if (config.readingPrefs) {
-        localStorage.setItem('reader_prefs_v1', JSON.stringify(config.readingPrefs));
-        this.applyReadingPrefs(config.readingPrefs);
+        const normalizedPrefs = normalizeReadingPrefs(config.readingPrefs);
+        localStorage.setItem('reader_prefs_v1', JSON.stringify(normalizedPrefs));
+        this.applyReadingPrefs(normalizedPrefs);
       }
 
       // 应用最后阅读的书籍
@@ -235,24 +284,59 @@ export class ConfigManager {
 
   // 应用阅读偏好
   applyReadingPrefs(prefs) {
-    document.documentElement.style.setProperty('--para-spacing', String(prefs.paraSpacing));
-    document.documentElement.style.setProperty('--letter-spacing', `${prefs.letterSpacing}px`);
-    
-    // 更新设置面板中的滑块值
+    const normalized = normalizeReadingPrefs(prefs);
+    document.documentElement.style.setProperty('--para-spacing', String(normalized.paraSpacing));
+    document.documentElement.style.setProperty('--letter-spacing', `${normalized.letterSpacing}px`);
+    document.documentElement.style.setProperty('--line-height', String(normalized.lineHeight));
+    document.documentElement.style.setProperty('--page-width', `${normalized.pageWidth}px`);
+    document.documentElement.style.setProperty('--page-padding-x', `${normalized.pagePadding}px`);
+    document.documentElement.style.setProperty('--page-padding-y', `${computeVerticalPadding(normalized.pagePadding)}px`);
+
     const paraSpacingInput = document.getElementById('paraSpacingInput');
     const letterSpacingInput = document.getElementById('letterSpacingInput');
+    const lineHeightInput = document.getElementById('lineHeightInput');
+    const pageWidthInput = document.getElementById('pageWidthInput');
+    const pageMarginInput = document.getElementById('pageMarginInput');
+
     const paraSpacingVal = document.getElementById('paraSpacingVal');
     const letterSpacingVal = document.getElementById('letterSpacingVal');
-    
+    const lineHeightVal = document.getElementById('lineHeightVal');
+    const pageWidthVal = document.getElementById('pageWidthVal');
+    const pageMarginVal = document.getElementById('pageMarginVal');
+    const progressToggle = document.getElementById('progressBarToggle');
+
+    const formatDecimal = (value) => Number(value).toFixed(2).replace(/\.0+$/, '').replace(/\.([1-9])0$/, '.$1');
+
     if (paraSpacingInput) {
-      paraSpacingInput.value = prefs.paraSpacing;
-      if (paraSpacingVal) paraSpacingVal.textContent = prefs.paraSpacing;
+      paraSpacingInput.value = String(normalized.paraSpacing);
+      if (paraSpacingVal) paraSpacingVal.textContent = formatDecimal(normalized.paraSpacing);
     }
-    
+
     if (letterSpacingInput) {
-      letterSpacingInput.value = prefs.letterSpacing;
-      if (letterSpacingVal) letterSpacingVal.textContent = prefs.letterSpacing + 'px';
+      letterSpacingInput.value = String(normalized.letterSpacing);
+      if (letterSpacingVal) letterSpacingVal.textContent = `${formatDecimal(normalized.letterSpacing)}px`;
     }
+
+    if (lineHeightInput) {
+      lineHeightInput.value = String(normalized.lineHeight);
+      if (lineHeightVal) lineHeightVal.textContent = formatDecimal(normalized.lineHeight);
+    }
+
+    if (pageWidthInput) {
+      pageWidthInput.value = String(normalized.pageWidth);
+      if (pageWidthVal) pageWidthVal.textContent = `${Math.round(normalized.pageWidth)}px`;
+    }
+
+    if (pageMarginInput) {
+      pageMarginInput.value = String(normalized.pagePadding);
+      if (pageMarginVal) pageMarginVal.textContent = `${Math.round(normalized.pagePadding)}px`;
+    }
+
+    if (progressToggle) {
+      progressToggle.checked = normalized.progressBarEnabled !== false;
+    }
+
+    applyProgressBarDisplay(normalized.progressBarEnabled !== false);
   }
 
   // 更新主题UI

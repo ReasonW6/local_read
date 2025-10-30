@@ -6,7 +6,6 @@ export const DOM = {
   bookshelfList: () => document.getElementById('bookshelfList'),
   sidebar: () => document.getElementById('sidebar'),
   tocToggleBtn: () => document.getElementById('tocToggleBtn'),
-  bookshelfBtn: () => document.getElementById('bookshelfBtn'),
   bookmarkListBtn: () => document.getElementById('bookmarkListBtn'),
   themeToggle: () => document.getElementById('themeToggle'),
   bookMeta: () => document.getElementById('book-meta'),
@@ -26,7 +25,9 @@ export const CONFIG = {
   MAX_FONT_SIZE: 32,
   SERVER_API: {
     BOOKSHELF: '/api/bookshelf',
-    BOOK: '/api/book'
+    BOOK: '/api/book',
+    BOOK_COVER: '/api/book-cover',
+    UPLOAD: '/api/upload'
   },
   STORAGE_KEYS: {
     BOOKMARKS: 'bookmarks',

@@ -11,6 +11,10 @@
   --toolbar-bg: #FFFFFF;
   --para-spacing: 1;
   --letter-spacing: 0.2px;
+  --line-height: 1.8;
+  --page-width: 800px;
+  --page-padding-x: 40px;
+  --page-padding-y: 30px;
   --font-size: 18px; /* 默认字体大小 */
 }
 
@@ -52,22 +56,24 @@ body{
   flex:1;
   display:flex;
   justify-content: center;
-  padding: 0 30px;
+  align-items: flex-start;
+  padding: 0;
   overflow: auto;
   scroll-behavior: smooth;
   overscroll-behavior-y: contain;
 }
 
 .reader{
-  max-width: 800px;
-  width:100%;
+  width: 100%;
+  max-width: var(--page-width, 800px);
   background: var(--bg);
-  padding: 30px 40px;
+  padding: var(--page-padding-y, 30px) var(--page-padding-x, 40px);
+  box-sizing: border-box;
   border-radius: 4px;
   box-shadow:0 2px 10px var(--shadow-color);
   height: fit-content;
   min-height: 95%;
-  font-size: var(--font-size, 18px); /* 使用CSS变量 */
+  font-size: var(--font-size, 18px);
 }
 
 .reader h1{
@@ -79,7 +85,7 @@ body{
 
 .reader p{
   font-size:1em;
-  line-height:1.8;
+  line-height: var(--line-height, 1.8);
   letter-spacing: var(--letter-spacing, 0.2px);
   margin: 0 0 calc(var(--para-spacing, 1) * 1em);
   text-indent:2em
