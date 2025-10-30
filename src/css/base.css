@@ -65,7 +65,7 @@ body{
 
 .reader{
   width: 100%;
-  max-width: calc(var(--page-width, 800px) + 2 * var(--page-padding-x, 40px));
+  max-width: var(--page-width, 800px);
   background: var(--bg);
   padding: var(--page-padding-y, 30px) var(--page-padding-x, 40px);
   box-sizing: border-box;
