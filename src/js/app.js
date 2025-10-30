@@ -51,32 +51,76 @@ if (queryTheme === CONFIG.THEMES.DARK || queryTheme === CONFIG.THEMES.LIGHT) {
 
 /* ========== 设置面板与阅读偏好 ========== */
 const PREFS_KEY = 'reader_prefs_v1';
-const defaultPrefs = { paraSpacing: 1, letterSpacing: 0.2 };
+const defaultPrefs = {
+  paraSpacing: 1,
+  letterSpacing: 0.2,
+  lineHeight: 1.8,
+  pageWidth: 800,
+  pagePadding: 40,
+  progressBarEnabled: true
+};
+
+function computeVerticalPadding(horizontalPadding) {
+  const horizontal = Number(horizontalPadding);
+  if (!Number.isFinite(horizontal)) {
+    return Math.round(defaultPrefs.pagePadding * 0.75);
+  }
+  return Math.max(20, Math.round(horizontal * 0.75));
+}
+
+function normalizePrefs(raw = {}) {
+  const merged = { ...defaultPrefs, ...raw };
+  const clamp = (value, min, max, fallback) => {
+    const num = Number(value);
+    if (Number.isFinite(num)) {
+      return Math.min(Math.max(num, min), max);
+    }
+    return fallback;
+  };
+
+  const paraSpacing = clamp(merged.paraSpacing, 0.4, 3, defaultPrefs.paraSpacing);
+  const letterSpacing = clamp(merged.letterSpacing, 0, 3, defaultPrefs.letterSpacing);
+  const lineHeight = clamp(merged.lineHeight, 1.2, 2.8, defaultPrefs.lineHeight);
+  const pageWidth = Math.round(clamp(merged.pageWidth, 480, 1400, defaultPrefs.pageWidth));
+  const pagePadding = Math.round(clamp(merged.pagePadding, 16, 120, defaultPrefs.pagePadding));
+  const progressBarEnabled = merged.progressBarEnabled !== false;
+
+  return { paraSpacing, letterSpacing, lineHeight, pageWidth, pagePadding, progressBarEnabled };
+}
 
 function getReadingPrefs() {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     if (!raw) return { ...defaultPrefs };
     const parsed = JSON.parse(raw);
-    return { ...defaultPrefs, ...parsed };
+    return normalizePrefs(parsed);
   } catch {
     return { ...defaultPrefs };
   }
 }
 
 function saveReadingPrefs(prefs) {
-  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  const normalized = normalizePrefs(prefs);
+  localStorage.setItem(PREFS_KEY, JSON.stringify(normalized));
+  return normalized;
 }
 
 function applyTypography(prefs) {
-  document.documentElement.style.setProperty('--para-spacing', String(prefs.paraSpacing));
-  document.documentElement.style.setProperty('--letter-spacing', `${prefs.letterSpacing}px`);
-  applyEpubTypographyToContents(prefs);
+  const normalized = normalizePrefs(prefs);
+  document.documentElement.style.setProperty('--para-spacing', String(normalized.paraSpacing));
+  document.documentElement.style.setProperty('--letter-spacing', `${normalized.letterSpacing}px`);
+  document.documentElement.style.setProperty('--line-height', String(normalized.lineHeight));
+  document.documentElement.style.setProperty('--page-width', `${normalized.pageWidth}px`);
+  document.documentElement.style.setProperty('--page-padding-x', `${normalized.pagePadding}px`);
+  document.documentElement.style.setProperty('--page-padding-y', `${computeVerticalPadding(normalized.pagePadding)}px`);
+  applyEpubTypographyToContents(normalized);
   requestAnimationFrame(updateReadingProgress);
 }
 
 function applyEpubTypographyToContents(prefs) {
   if (!state.rendition) return;
+  const normalized = normalizePrefs(prefs);
+  const verticalPadding = computeVerticalPadding(normalized.pagePadding);
   const contents = state.rendition.getContents();
   contents.forEach(content => {
     try {
@@ -90,9 +134,16 @@ function applyEpubTypographyToContents(prefs) {
         doc.head.appendChild(style);
       }
       style.textContent = `
+        html, body {
+          margin: 0 auto !important;
+          padding: ${verticalPadding}px ${normalized.pagePadding}px !important;
+          max-width: ${normalized.pageWidth}px !important;
+          line-height: ${normalized.lineHeight} !important;
+        }
         p { 
-          letter-spacing: ${prefs.letterSpacing}px !important; 
-          margin-bottom: calc(${prefs.paraSpacing} * 1em) !important; 
+          letter-spacing: ${normalized.letterSpacing}px !important; 
+          margin-bottom: calc(${normalized.paraSpacing} * 1em) !important; 
+          line-height: inherit !important;
         }
       `;
     } catch {}
@@ -104,6 +155,18 @@ function applyEpubTypographyToContents(prefs) {
       });
       state.rendition._typographyHooked = true;
     } catch {}
+  }
+  
+  // 强制重新渲染 EPUB 内容以应用新的布局设置
+  try {
+    if (state.rendition && state.rendition.manager && state.rendition.manager.layout) {
+      // 触发重新计算布局
+      requestAnimationFrame(() => {
+        state.rendition.resize();
+      });
+    }
+  } catch (e) {
+    // 忽略错误，某些 EPUB 可能不支持 resize
   }
 }
 
@@ -125,6 +188,10 @@ function saveCompleteReadingState() {
     theme: state.theme,
     paraSpacing: currentPrefs.paraSpacing,
     letterSpacing: currentPrefs.letterSpacing,
+    lineHeight: currentPrefs.lineHeight,
+    pageWidth: currentPrefs.pageWidth,
+    pagePadding: currentPrefs.pagePadding,
+    progressBarEnabled: currentPrefs.progressBarEnabled !== false,
     readingPercentage: readingPercentage, // 保存阅读进度百分比
     timestamp: Date.now()
   };
@@ -169,16 +236,23 @@ function loadCompleteReadingState() {
     }
     
     // 应用排版设置
-    if (savedState.paraSpacing !== undefined || savedState.letterSpacing !== undefined) {
-      const newPrefs = {
-        paraSpacing: savedState.paraSpacing || defaultPrefs.paraSpacing,
-        letterSpacing: savedState.letterSpacing || defaultPrefs.letterSpacing
-      };
-      saveReadingPrefs(newPrefs);
-      applyTypography(newPrefs);
+    const hasTypographyState = ['paraSpacing', 'letterSpacing', 'lineHeight', 'pageWidth', 'pagePadding', 'progressBarEnabled']
+      .some(key => savedState[key] !== undefined);
+
+    if (hasTypographyState) {
+      const mergedPrefs = { ...getReadingPrefs() };
+      ['paraSpacing', 'letterSpacing', 'lineHeight', 'pageWidth', 'pagePadding', 'progressBarEnabled'].forEach(key => {
+        if (savedState[key] !== undefined) {
+          mergedPrefs[key] = savedState[key];
+        }
+      });
+
+      const normalizedPrefs = saveReadingPrefs(mergedPrefs);
+      applyTypography(normalizedPrefs);
+      applyProgressBarPreference(normalizedPrefs.progressBarEnabled !== false);
       
       // 更新设置面板UI
-      updateSettingsPanelUI(newPrefs);
+      updateSettingsPanelUI(normalizedPrefs);
     }
     
     // 恢复阅读进度百分比
@@ -203,15 +277,34 @@ function loadCompleteReadingState() {
 
 // Update settings panel UI with loaded values
 function updateSettingsPanelUI(prefs) {
+  const normalized = normalizePrefs(prefs);
+  const formatDecimal = (value) => Number(value).toFixed(2).replace(/\.0+$/, '').replace(/\.([1-9])0$/, '.$1');
+
   const paraInput = document.getElementById('paraSpacingInput');
   const letterInput = document.getElementById('letterSpacingInput');
+  const lineHeightInput = document.getElementById('lineHeightInput');
+  const pageWidthInput = document.getElementById('pageWidthInput');
+  const pageMarginInput = document.getElementById('pageMarginInput');
+
   const paraVal = document.getElementById('paraSpacingVal');
   const letterVal = document.getElementById('letterSpacingVal');
-  
-  if (paraInput) paraInput.value = String(prefs.paraSpacing);
-  if (letterInput) letterInput.value = String(prefs.letterSpacing);
-  if (paraVal) paraVal.textContent = `${prefs.paraSpacing}`;
-  if (letterVal) letterVal.textContent = `${prefs.letterSpacing}px`;
+  const lineHeightVal = document.getElementById('lineHeightVal');
+  const pageWidthVal = document.getElementById('pageWidthVal');
+  const pageMarginVal = document.getElementById('pageMarginVal');
+  const progressToggle = document.getElementById('progressBarToggle');
+
+  if (paraInput) paraInput.value = String(normalized.paraSpacing);
+  if (letterInput) letterInput.value = String(normalized.letterSpacing);
+  if (lineHeightInput) lineHeightInput.value = String(normalized.lineHeight);
+  if (pageWidthInput) pageWidthInput.value = String(normalized.pageWidth);
+  if (pageMarginInput) pageMarginInput.value = String(normalized.pagePadding);
+
+  if (paraVal) paraVal.textContent = formatDecimal(normalized.paraSpacing);
+  if (letterVal) letterVal.textContent = `${formatDecimal(normalized.letterSpacing)}px`;
+  if (lineHeightVal) lineHeightVal.textContent = formatDecimal(normalized.lineHeight);
+  if (pageWidthVal) pageWidthVal.textContent = `${Math.round(normalized.pageWidth)}px`;
+  if (pageMarginVal) pageMarginVal.textContent = `${Math.round(normalized.pagePadding)}px`;
+  if (progressToggle) progressToggle.checked = normalized.progressBarEnabled !== false;
 }
 
 function deriveBookNameFromPath(path) {
@@ -302,9 +395,10 @@ async function preloadGlobalSettings() {
       
       // 立即应用阅读偏好
       if (config.readingPrefs) {
-        localStorage.setItem('reader_prefs_v1', JSON.stringify(config.readingPrefs));
-        document.documentElement.style.setProperty('--para-spacing', String(config.readingPrefs.paraSpacing || 1));
-        document.documentElement.style.setProperty('--letter-spacing', `${config.readingPrefs.letterSpacing || 0.2}px`);
+        const normalizedPrefs = saveReadingPrefs(config.readingPrefs);
+        applyTypography(normalizedPrefs);
+        applyProgressBarPreference(normalizedPrefs.progressBarEnabled !== false);
+        updateSettingsPanelUI(normalizedPrefs);
       }
       
       console.log('全局设置已预加载');
@@ -393,14 +487,21 @@ async function preloadBookSettings() {
     }
     
     // 立即应用排版设置
-    if (savedState.paraSpacing !== undefined || savedState.letterSpacing !== undefined) {
-      const newPrefs = {
-        paraSpacing: savedState.paraSpacing || defaultPrefs.paraSpacing,
-        letterSpacing: savedState.letterSpacing || defaultPrefs.letterSpacing
-      };
-      saveReadingPrefs(newPrefs);
-      applyTypography(newPrefs);
-      updateSettingsPanelUI(newPrefs);
+    const hasTypographyState = ['paraSpacing', 'letterSpacing', 'lineHeight', 'pageWidth', 'pagePadding', 'progressBarEnabled']
+      .some(key => savedState[key] !== undefined);
+
+    if (hasTypographyState) {
+      const mergedPrefs = { ...getReadingPrefs() };
+      ['paraSpacing', 'letterSpacing', 'lineHeight', 'pageWidth', 'pagePadding', 'progressBarEnabled'].forEach(key => {
+        if (savedState[key] !== undefined) {
+          mergedPrefs[key] = savedState[key];
+        }
+      });
+
+      const normalizedPrefs = saveReadingPrefs(mergedPrefs);
+      applyTypography(normalizedPrefs);
+      applyProgressBarPreference(normalizedPrefs.progressBarEnabled !== false);
+      updateSettingsPanelUI(normalizedPrefs);
     }
     
   } catch (error) {
@@ -583,26 +684,17 @@ function initKeyboardShortcuts() {
         break;
       case '+':
       case '=':
-        updateReadingProgress(); // 先保存当前百分比
-        changeFontSize(1);
-        saveCompleteReadingState();
-        restoreScrollPositionByPercentage(); // 恢复到相同百分比位置
+        window.changeFontSize(1);
         e.preventDefault();
         break;
       case '-':
       case '_':
-        updateReadingProgress(); // 先保存当前百分比
-        changeFontSize(-1);
-        saveCompleteReadingState();
-        restoreScrollPositionByPercentage(); // 恢复到相同百分比位置
+        window.changeFontSize(-1);
         e.preventDefault();
         break;
       case 't':
       case 'T':
-        toggleTheme();
-        saveCompleteReadingState();
-        requestAnimationFrame(() => applyTypography(getReadingPrefs()));
-        requestAnimationFrame(updateReadingProgress);
+        window.toggleTheme();
         e.preventDefault();
         break;
       case 'b':
@@ -691,41 +783,73 @@ function initSettingsNavigation() {
 function initSettingsPanel() {
   const settingsBtn = document.getElementById('settingsBtn');
   const mask = document.getElementById('settingsMask');
-  const modal = document.getElementById('settingsModal');
   const closeBtn = document.getElementById('settingsClose');
   const paraInput = document.getElementById('paraSpacingInput');
   const letterInput = document.getElementById('letterSpacingInput');
-  const paraVal = document.getElementById('paraSpacingVal');
-  const letterVal = document.getElementById('letterSpacingVal');
+  const lineHeightInput = document.getElementById('lineHeightInput');
+  const pageWidthInput = document.getElementById('pageWidthInput');
+  const pageMarginInput = document.getElementById('pageMarginInput');
   const resetBtn = document.getElementById('resetReadingPrefsBtn');
 
   // 初始化导航功能
   initSettingsNavigation();
 
-  const prefs = getReadingPrefs();
-  if (paraInput) paraInput.value = String(prefs.paraSpacing);
-  if (letterInput) letterInput.value = String(prefs.letterSpacing);
-  if (paraVal) paraVal.textContent = `${prefs.paraSpacing}`;
-  if (letterVal) letterVal.textContent = `${prefs.letterSpacing}px`;
-
-  applyTypography(prefs);
+  const initialPrefs = normalizePrefs(getReadingPrefs());
+  updateSettingsPanelUI(initialPrefs);
+  applyTypography(initialPrefs);
+  applyProgressBarPreference(initialPrefs.progressBarEnabled !== false);
   updateSettingsStatus();
 
   // 顶部进度条开关初始化与监听（默认开启）
   const progressToggle = document.getElementById('progressBarToggle');
-  const progressEnabled = prefs.progressBarEnabled !== false;
   if (progressToggle) {
-    progressToggle.checked = progressEnabled;
-    applyProgressBarPreference(progressEnabled);
+    progressToggle.checked = initialPrefs.progressBarEnabled !== false;
     progressToggle.addEventListener('change', () => {
       const next = { ...getReadingPrefs(), progressBarEnabled: progressToggle.checked };
-      saveReadingPrefs(next);
-      applyProgressBarPreference(progressToggle.checked);
-      if (typeof saveCompleteReadingState === 'function') {
-        saveCompleteReadingState();
-      }
+      const normalized = saveReadingPrefs(next);
+      applyProgressBarPreference(normalized.progressBarEnabled !== false);
+      updateSettingsPanelUI(normalized);
+      saveCompleteReadingState();
+      showSavedIndicator();
     });
   }
+
+  // 使用防抖来优化性能，避免频繁调整时造成卡顿
+  let prefChangeTimeout = null;
+  
+  const handlePrefChange = (partial) => {
+    // 判断是否是会影响页面布局的设置（页宽、页边距）
+    const isLayoutChange = 'pageWidth' in partial || 'pagePadding' in partial;
+    
+    // 如果是布局变化，先保存当前阅读进度百分比
+    if (isLayoutChange) {
+      updateReadingProgress();
+    }
+    
+    const next = { ...getReadingPrefs(), ...partial };
+    const normalized = saveReadingPrefs(next);
+    
+    // 立即更新UI显示
+    updateSettingsPanelUI(normalized);
+    
+    // 应用排版样式（立即生效）
+    applyTypography(normalized);
+    applyProgressBarPreference(normalized.progressBarEnabled !== false);
+    
+    // 防抖保存状态和恢复位置
+    clearTimeout(prefChangeTimeout);
+    prefChangeTimeout = setTimeout(() => {
+      saveCompleteReadingState();
+      showSavedIndicator();
+      
+      // 如果是布局变化，恢复到相同的阅读进度百分比
+      if (isLayoutChange) {
+        requestAnimationFrame(() => {
+          restoreScrollPositionByPercentage();
+        });
+      }
+    }, 100); // 100ms 防抖延迟
+  };
 
   function openSettings() {
     if (mask) mask.classList.add('show');
@@ -757,36 +881,37 @@ function initSettingsPanel() {
 
   if (paraInput) {
     paraInput.addEventListener('input', () => {
-      const val = Number(paraInput.value);
-      const next = { ...getReadingPrefs(), paraSpacing: Math.max(0.4, Math.min(3, val)) };
-      if (paraVal) paraVal.textContent = `${next.paraSpacing}`;
-      saveReadingPrefs(next);
-      applyTypography(next);
-      saveCompleteReadingState();
+      handlePrefChange({ paraSpacing: Number(paraInput.value) });
     });
   }
   if (letterInput) {
     letterInput.addEventListener('input', () => {
-      const val = Number(letterInput.value);
-      const next = { ...getReadingPrefs(), letterSpacing: Math.max(0, Math.min(3, val)) };
-      if (letterVal) letterVal.textContent = `${next.letterSpacing}px`;
-      saveReadingPrefs(next);
-      applyTypography(next);
-      saveCompleteReadingState();
+      handlePrefChange({ letterSpacing: Number(letterInput.value) });
+    });
+  }
+  if (lineHeightInput) {
+    lineHeightInput.addEventListener('input', () => {
+      handlePrefChange({ lineHeight: Number(lineHeightInput.value) });
+    });
+  }
+  if (pageWidthInput) {
+    pageWidthInput.addEventListener('input', () => {
+      handlePrefChange({ pageWidth: Number(pageWidthInput.value) });
+    });
+  }
+  if (pageMarginInput) {
+    pageMarginInput.addEventListener('input', () => {
+      handlePrefChange({ pagePadding: Number(pageMarginInput.value) });
     });
   }
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
-      const next = { ...defaultPrefs };
-      if (paraInput) paraInput.value = String(next.paraSpacing);
-      if (letterInput) letterInput.value = String(next.letterSpacing);
-      if (paraVal) paraVal.textContent = `${next.paraSpacing}`;
-      if (letterVal) letterVal.textContent = `${next.letterSpacing}px`;
-      saveReadingPrefs(next);
-      applyTypography(next);
-      // 重置后也保存完整状态
+      const normalized = saveReadingPrefs(defaultPrefs);
+      updateSettingsPanelUI(normalized);
+      applyTypography(normalized);
+      applyProgressBarPreference(normalized.progressBarEnabled !== false);
       saveCompleteReadingState();
-      // 更新状态显示
+      showSavedIndicator();
       updateSettingsStatus();
     });
   }
@@ -797,6 +922,7 @@ window.changeFontSize = (delta) => {
   updateReadingProgress(); // 先保存当前百分比
   changeFontSize(delta);
   saveCompleteReadingState();
+  showSavedIndicator();
   updateSettingsStatus();
   restoreScrollPositionByPercentage(); // 恢复到相同百分比位置
 };
@@ -804,6 +930,7 @@ window.changeFontSize = (delta) => {
 window.toggleTheme = () => {
   toggleTheme();
   saveCompleteReadingState();
+  showSavedIndicator();
   updateSettingsStatus();
   requestAnimationFrame(() => applyTypography(getReadingPrefs()));
   requestAnimationFrame(updateReadingProgress);
@@ -1362,28 +1489,13 @@ function setupEventListeners() {
   const fontDecreaseBtn = DOM.fontDecreaseBtn();
   
   if (themeToggle) {
-    themeToggle.addEventListener('click', () => { 
-      toggleTheme(); 
-      saveCompleteReadingState();
-      requestAnimationFrame(() => applyTypography(getReadingPrefs()));
-      requestAnimationFrame(updateReadingProgress); 
-    });
+    themeToggle.addEventListener('click', () => window.toggleTheme());
   }
   if (fontIncreaseBtn) {
-    fontIncreaseBtn.addEventListener('click', () => { 
-      updateReadingProgress(); // 先保存当前百分比
-      changeFontSize(1); 
-      saveCompleteReadingState();
-      restoreScrollPositionByPercentage(); // 恢复到相同百分比位置
-    });
+    fontIncreaseBtn.addEventListener('click', () => window.changeFontSize(1));
   }
   if (fontDecreaseBtn) {
-    fontDecreaseBtn.addEventListener('click', () => { 
-      updateReadingProgress(); // 先保存当前百分比
-      changeFontSize(-1); 
-      saveCompleteReadingState();
-      restoreScrollPositionByPercentage(); // 恢复到相同百分比位置
-    });
+    fontDecreaseBtn.addEventListener('click', () => window.changeFontSize(-1));
   }
   
   // Bookmark and progress controls
