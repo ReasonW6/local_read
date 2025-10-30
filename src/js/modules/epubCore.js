@@ -14,6 +14,13 @@ export function registerAndApplyEpubTheme(theme) {
     "box-sizing": "border-box !important"
   };
   
+  const imageStyles = {
+    "max-width": "100% !important",
+    "height": "auto !important",
+    "display": "block !important",
+    "margin": "1em auto !important"
+  };
+  
   // 强制清除所有现有样式
   const contents = state.rendition.getContents();
   contents.forEach(content => {
@@ -39,6 +46,9 @@ export function registerAndApplyEpubTheme(theme) {
     "p, div, span, h1, h2, h3, h4, h5, h6, li, td, th": { 
       "color": "#3D3D3D !important" 
     },
+    "img, image, svg": {
+      ...imageStyles
+    },
     "*": { 
       "background-color": "transparent !important" 
     }
@@ -52,6 +62,9 @@ export function registerAndApplyEpubTheme(theme) {
     }, 
     "p, div, span, h1, h2, h3, h4, h5, h6, li, td, th": { 
       "color": "#BDBDBD !important" 
+    },
+    "img, image, svg": {
+      ...imageStyles
     },
     "*": { 
       "background-color": "transparent !important" 
@@ -87,12 +100,24 @@ export function registerAndApplyEpubTheme(theme) {
              color: #3D3D3D !important; 
              background-color: transparent !important; 
            }
-           body { background-color: #FAF7ED !important; }` :
+           body { background-color: #FAF7ED !important; }
+           img, image, svg { 
+             max-width: 100% !important; 
+             height: auto !important; 
+             display: block !important; 
+             margin: 1em auto !important; 
+           }` :
           `body, p, div, span, h1, h2, h3, h4, h5, h6, li, td, th { 
              color: #BDBDBD !important; 
              background-color: transparent !important; 
            }
-           body { background-color: #121212 !important; }`;
+           body { background-color: #121212 !important; }
+           img, image, svg { 
+             max-width: 100% !important; 
+             height: auto !important; 
+             display: block !important; 
+             margin: 1em auto !important; 
+           }`;
         
         style.textContent = themeStyles;
         content.document.head.appendChild(style);

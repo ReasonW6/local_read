@@ -96,6 +96,16 @@ body{
   min-height:300px
 }
 
+/* EPUB 图片样式保护 */
+.epub-container img,
+.epub-container image,
+.epub-container svg {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block;
+  margin: 1em auto;
+}
+
 .muted{
   color:var(--muted);
   font-size:13px
