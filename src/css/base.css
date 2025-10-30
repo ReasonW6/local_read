@@ -56,22 +56,24 @@ body{
   flex:1;
   display:flex;
   justify-content: center;
-  padding: 0 30px;
+  align-items: flex-start;
+  padding: 0;
   overflow: auto;
   scroll-behavior: smooth;
   overscroll-behavior-y: contain;
 }
 
 .reader{
-  max-width: var(--page-width, 800px);
-  width:100%;
+  width: 100%;
+  max-width: calc(var(--page-width, 800px) + 2 * var(--page-padding-x, 40px));
   background: var(--bg);
   padding: var(--page-padding-y, 30px) var(--page-padding-x, 40px);
+  box-sizing: border-box;
   border-radius: 4px;
   box-shadow:0 2px 10px var(--shadow-color);
   height: fit-content;
   min-height: 95%;
-  font-size: var(--font-size, 18px); /* 使用CSS变量 */
+  font-size: var(--font-size, 18px);
 }
 
 .reader h1{
