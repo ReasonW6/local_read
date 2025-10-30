@@ -6,7 +6,6 @@ export const DOM = {
   bookshelfList: () => document.getElementById('bookshelfList'),
   sidebar: () => document.getElementById('sidebar'),
   tocToggleBtn: () => document.getElementById('tocToggleBtn'),
-  bookshelfBtn: () => document.getElementById('bookshelfBtn'),
   bookmarkListBtn: () => document.getElementById('bookmarkListBtn'),
   themeToggle: () => document.getElementById('themeToggle'),
   bookMeta: () => document.getElementById('book-meta'),

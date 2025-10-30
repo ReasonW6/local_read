@@ -1311,7 +1311,6 @@ function setupEventListeners() {
     let booksFromLoad;
     try {
       booksFromLoad = await loadBookshelf();
-      toggleSidebar(CONFIG.SIDEBAR_VIEWS.BOOKSHELF);
       requestAnimationFrame(updateReadingProgress);
     } catch (error) {
       // loadBookshelf 内部已处理错误提示
@@ -1331,13 +1330,9 @@ function setupEventListeners() {
   });
   
   // Sidebar navigation
-  const bookshelfBtn = DOM.bookshelfBtn();
   const tocToggleBtn = DOM.tocToggleBtn();
   const bookmarkListBtn = DOM.bookmarkListBtn();
   
-  if (bookshelfBtn) {
-    bookshelfBtn.addEventListener('click', () => toggleSidebar(CONFIG.SIDEBAR_VIEWS.BOOKSHELF));
-  }
   if (tocToggleBtn) {
     tocToggleBtn.addEventListener('click', () => toggleSidebar(CONFIG.SIDEBAR_VIEWS.TOC));
   }
