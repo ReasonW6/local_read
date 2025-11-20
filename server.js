@@ -34,25 +34,25 @@ const storage = multer.diskStorage({
     const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
     let finalName = originalName;
     let counter = 1;
-    
+
     while (fs.existsSync(path.join(booksDirectory, finalName))) {
       const ext = path.extname(originalName);
       const nameWithoutExt = path.basename(originalName, ext);
       finalName = `${nameWithoutExt}(${counter})${ext}`;
       counter++;
     }
-    
+
     cb(null, finalName);
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   fileFilter: function (req, file, cb) {
     const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
     const allowedExtensions = ['.epub', '.txt', '.pdf'];
     const ext = path.extname(originalName).toLowerCase();
-    
+
     if (allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {
@@ -218,15 +218,15 @@ app.get('/api/book-cover', (req, res) => {
 app.post('/api/save-config', (req, res) => {
   try {
     const { config, filename } = req.body;
-    
+
     if (!config) {
       return res.status(400).json({ error: '配置数据不能为空' });
     }
-    
+
     // 生成文件名（如果没有提供）
     const configFilename = filename || `reader-config-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
     const configPath = path.join(configDirectory, configFilename);
-    
+
     // 添加元数据
     const configWithMeta = {
       ...config,
@@ -237,11 +237,11 @@ app.post('/api/save-config', (req, res) => {
         appName: 'Local E-Book Reader'
       }
     };
-    
+
     fs.writeFileSync(configPath, JSON.stringify(configWithMeta, null, 2));
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: '配置保存成功',
       filename: configFilename,
       path: configPath
@@ -257,14 +257,14 @@ app.get('/api/load-config/:filename', (req, res) => {
   try {
     const filename = req.params.filename;
     const configPath = path.join(configDirectory, filename);
-    
+
     if (!fs.existsSync(configPath)) {
       return res.status(404).json({ error: '配置文件不存在' });
     }
-    
+
     const configData = fs.readFileSync(configPath, 'utf8');
     const config = JSON.parse(configData);
-    
+
     res.json({
       success: true,
       config: config,
@@ -284,7 +284,7 @@ app.get('/api/config-list', (req, res) => {
       .map(file => {
         const filePath = path.join(configDirectory, file);
         const stats = fs.statSync(filePath);
-        
+
         // 尝试读取文件元数据
         let metadata = null;
         try {
@@ -293,7 +293,7 @@ app.get('/api/config-list', (req, res) => {
         } catch (e) {
           // 忽略解析错误
         }
-        
+
         return {
           filename: file,
           size: stats.size,
@@ -303,7 +303,7 @@ app.get('/api/config-list', (req, res) => {
         };
       })
       .sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt)); // 按修改时间倒序
-    
+
     res.json({
       success: true,
       configs: files
@@ -319,13 +319,13 @@ app.delete('/api/config/:filename', (req, res) => {
   try {
     const filename = req.params.filename;
     const configPath = path.join(configDirectory, filename);
-    
+
     if (!fs.existsSync(configPath)) {
       return res.status(404).json({ error: '配置文件不存在' });
     }
-    
+
     fs.unlinkSync(configPath);
-    
+
     res.json({
       success: true,
       message: '配置文件删除成功'
@@ -341,11 +341,11 @@ app.get('/api/download-config/:filename', (req, res) => {
   try {
     const filename = req.params.filename;
     const configPath = path.join(configDirectory, filename);
-    
+
     if (!fs.existsSync(configPath)) {
       return res.status(404).json({ error: '配置文件不存在' });
     }
-    
+
     res.download(configPath, filename);
   } catch (error) {
     console.error('Error downloading config:', error);
@@ -359,17 +359,17 @@ app.post('/api/upload', upload.array('books'), (req, res) => {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: '没有选择文件' });
     }
-    
+
     const uploadedFiles = req.files.map(file => ({
       originalName: Buffer.from(file.originalname, 'latin1').toString('utf8'),
       savedName: file.filename,
       size: file.size
     }));
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: `成功上传 ${uploadedFiles.length} 个文件`,
-      files: uploadedFiles 
+      files: uploadedFiles
     });
   } catch (error) {
     console.error('Error uploading files:', error);
