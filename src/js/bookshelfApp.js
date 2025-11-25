@@ -1,4 +1,6 @@
 import { CONFIG } from './core/config.js';
+import { formatTimeAgo } from './core/utils.js';
+import { initAddBooksModal, openAddBooksModal } from './modules/addBooksModal.js';
 
 const state = {
   books: [],
@@ -19,10 +21,10 @@ const els = {
   search: document.getElementById('bookSearchInput'),
   themeToggle: document.getElementById('themeToggle'),
   addBtn: document.getElementById('addBookBtn'),
-  emptyAddBtn: document.getElementById('emptyAddBtn'),
   fileInput: document.getElementById('bookFileInput'),
   toast: document.getElementById('toast'),
-  template: document.getElementById('bookCardTemplate')
+  template: document.getElementById('bookCardTemplate'),
+  dragOverlay: document.getElementById('dragOverlay')
 };
 
 const THEME_STORAGE_KEY = 'local_reader_theme';
@@ -31,95 +33,38 @@ function showToast(message, type = 'info') {
   if (!els.toast) return;
   els.toast.textContent = message;
   els.toast.dataset.type = type;
-  els.toast.hidden = false;
-  requestAnimationFrame(() => els.toast.classList.add('show'));
+  els.toast.classList.add('show');
   clearTimeout(showToast._timer);
   showToast._timer = setTimeout(() => {
     els.toast.classList.remove('show');
-    setTimeout(() => {
-      els.toast.hidden = true;
-    }, 200);
-  }, 2600);
-}
-
-function formatFileSize(bytes = 0) {
-  if (!bytes) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const exponent = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-  const value = bytes / Math.pow(1024, exponent);
-  return `${value.toFixed(value >= 10 || exponent === 0 ? 0 : 1)} ${units[exponent]}`;
-}
-
-function formatTimeAgo(timestamp) {
-  if (!timestamp) return '尚未阅读';
-  const diff = Date.now() - Number(timestamp);
-  const minute = 60 * 1000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-  const week = 7 * day;
-  if (diff < minute) return '刚刚';
-  if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`;
-  if (diff < day) return `${Math.floor(diff / hour)} 小时前`;
-  if (diff < week) return `${Math.floor(diff / day)} 天前`;
-  const date = new Date(timestamp);
-  return `${date.getMonth() + 1}月${date.getDate()}日`;
+  }, 2500);
 }
 
 function loadLocalHistory() {
   try {
     const historyRaw = localStorage.getItem(CONFIG.STORAGE_KEYS.READING_HISTORY);
-    if (historyRaw) {
-      state.readingHistory = JSON.parse(historyRaw);
-    }
-  } catch (error) {
-    console.warn('Failed to load reading history:', error);
-    state.readingHistory = {};
-  }
+    if (historyRaw) state.readingHistory = JSON.parse(historyRaw);
 
-  try {
     const lastRaw = localStorage.getItem(CONFIG.STORAGE_KEYS.LAST_READ_BOOK);
-    if (lastRaw) {
-      state.lastReadBook = JSON.parse(lastRaw);
-    }
+    if (lastRaw) state.lastReadBook = JSON.parse(lastRaw);
   } catch (error) {
-    console.warn('Failed to load last read book:', error);
-    state.lastReadBook = null;
+    console.warn('Failed to load history:', error);
   }
 }
 
 function applyTheme(theme) {
   state.theme = theme;
-  document.body.dataset.theme = theme;
-  document.documentElement.setAttribute('data-theme', theme);
+
+  if (theme === 'dark') {
+    document.body.classList.add('dark-mode');
+  } else {
+    document.body.classList.remove('dark-mode');
+  }
+
   if (els.themeToggle) {
-    const label = els.themeToggle.querySelector('span');
-    if (label) {
-      label.textContent = theme === 'light' ? '夜间' : '日间';
-    }
+    els.themeToggle.textContent = theme === 'light' ? '夜间模式' : '日间模式';
   }
   localStorage.setItem(THEME_STORAGE_KEY, theme);
-}
-
-async function initializeTheme() {
-  const stored = localStorage.getItem(THEME_STORAGE_KEY);
-  if (stored === 'light' || stored === 'dark') {
-    applyTheme(stored);
-    return;
-  }
-  try {
-    const response = await fetch('/api/load-config/user-config.json');
-    if (response.ok) {
-      const { config } = await response.json();
-      const theme = config?.settings?.theme;
-      if (theme === 'light' || theme === 'dark') {
-        applyTheme(theme);
-        return;
-      }
-    }
-  } catch (error) {
-    console.warn('Unable to load theme from config:', error);
-  }
-  applyTheme('light');
 }
 
 function sortBooks(list) {
@@ -129,15 +74,10 @@ function sortBooks(list) {
     if (sortKey === 'recent') {
       const aTime = history[a.path]?.lastReadTime || 0;
       const bTime = history[b.path]?.lastReadTime || 0;
-      if (aTime === bTime) {
-        return (b.modifiedAt || 0) - (a.modifiedAt || 0);
-      }
+      if (aTime === bTime) return (b.modifiedAt || 0) - (a.modifiedAt || 0);
       return bTime - aTime;
     }
-    if (sortKey === 'title') {
-      return a.name.localeCompare(b.name, 'zh-CN');
-    }
-    // added
+    if (sortKey === 'title') return a.name.localeCompare(b.name, 'zh-CN');
     return (b.addedAt || 0) - (a.addedAt || 0);
   });
 }
@@ -145,187 +85,99 @@ function sortBooks(list) {
 function filterBooks(list) {
   if (!state.search) return list;
   const term = state.search.toLowerCase();
-  return list.filter(book => book.name.toLowerCase().includes(term) || book.path.toLowerCase().includes(term));
+  return list.filter(book => book.name.toLowerCase().includes(term));
 }
 
 function updateSummary() {
   if (!els.summary) return;
   const total = state.books.length;
-  const readCount = Object.keys(state.readingHistory).length;
-  const lastLabel = state.lastReadBook?.name ? `最近阅读：《${state.lastReadBook.name}》` : '尚未记录最近阅读';
-  els.summary.textContent = `共 ${total} 本书 · ${readCount} 本有阅读记录 · ${lastLabel}`;
+  els.summary.textContent = `共 ${total} 本`;
 }
 
 async function fetchBooks() {
   const response = await fetch(CONFIG.SERVER_API.BOOKSHELF);
-  if (!response.ok) {
-    throw new Error('无法加载书架');
-  }
-  const books = await response.json();
-  state.books = Array.isArray(books) ? books : [];
+  if (!response.ok) throw new Error('无法加载书架');
+  state.books = await response.json();
 }
 
 async function loadCover(book, card) {
-  if (!card) return;
-  const coverEl = card.querySelector('.book-cover');
   const img = card.querySelector('img');
-  const placeholder = card.querySelector('.cover-placeholder');
-
-  if (!coverEl || !img) return;
+  const placeholder = card.querySelector('.qd-cover-placeholder');
 
   if (!book.coverAvailable) {
-    state.covers.set(book.path, null);
     if (placeholder) {
-      placeholder.textContent = deriveInitial(book.name);
+      placeholder.textContent = book.name[0];
       placeholder.hidden = false;
     }
+    if (img) img.hidden = true;
     return;
   }
 
   const cached = state.covers.get(book.path);
-  if (cached !== undefined) {
-    if (cached) {
-      img.src = cached;
-      coverEl.classList.add('has-cover');
-      if (placeholder) placeholder.hidden = true;
-    }
+  if (cached) {
+    img.src = cached;
+    img.hidden = false;
+    if (placeholder) placeholder.hidden = true;
     return;
   }
 
   try {
     const response = await fetch(`${CONFIG.SERVER_API.BOOK_COVER}?path=${encodeURIComponent(book.path)}`);
-    if (!response.ok) throw new Error('Cover request failed');
-    const result = await response.json();
-    const cover = result?.cover || null;
-    state.covers.set(book.path, cover);
-    if (cover) {
-      img.src = cover;
-      coverEl.classList.add('has-cover');
-      if (placeholder) placeholder.hidden = true;
-    } else if (placeholder) {
-      placeholder.textContent = deriveInitial(book.name);
-      placeholder.hidden = false;
+    if (response.ok) {
+      const result = await response.json();
+      if (result.cover) {
+        state.covers.set(book.path, result.cover);
+        img.src = result.cover;
+        img.hidden = false;
+        if (placeholder) placeholder.hidden = true;
+        return;
+      }
     }
-  } catch (error) {
-    state.covers.set(book.path, null);
-    if (placeholder) {
-      placeholder.textContent = deriveInitial(book.name);
-      placeholder.hidden = false;
-    }
-    console.warn('Failed to load cover for', book.path, error);
-  }
-}
-
-function deriveInitial(name = '') {
-  const clean = name.trim();
-  if (!clean) return '📕';
-  const first = clean[0];
-  if (/^[\da-zA-Z]$/.test(first)) {
-    return first.toUpperCase();
-  }
-  return first;
-}
-
-function renderTags(book, container) {
-  if (!container) return;
-  container.innerHTML = '';
-  const history = state.readingHistory[book.path];
-  const tags = [];
-
-  if (state.lastReadBook && state.lastReadBook.path === book.path) {
-    tags.push({ label: '上次阅读', className: 'tag tag-accent' });
-  }
-  if (history?.lastReadTime) {
-    tags.push({ label: `最近 ${formatTimeAgo(history.lastReadTime)}`, className: 'tag tag-info' });
-  }
-  if (history?.readCount) {
-    tags.push({ label: `阅读 ${history.readCount} 次`, className: 'tag tag-muted' });
-  }
-  if (tags.length === 0) {
-    tags.push({ label: '尚未阅读', className: 'tag tag-muted' });
+  } catch (e) {
+    console.warn('Cover load failed', e);
   }
 
-  tags.forEach(tag => {
-    const span = document.createElement('span');
-    span.className = tag.className;
-    span.textContent = tag.label;
-    container.appendChild(span);
-  });
+  if (placeholder) {
+    placeholder.textContent = book.name[0];
+    placeholder.hidden = false;
+  }
+  if (img) img.hidden = true;
 }
 
 function createBookCard(book) {
-  if (!els.template) return null;
   const fragment = els.template.content.cloneNode(true);
-  const card = fragment.querySelector('.book-card');
-  if (!card) return null;
+  const card = fragment.querySelector('.qd-book-card');
 
-  card.dataset.path = book.path;
-  card.dataset.name = book.name;
-  card.tabIndex = 0;
-  card.setAttribute('role', 'button');
+  const title = card.querySelector('.qd-book-title');
+  title.textContent = book.name;
+  title.title = book.name;
 
-  const placeholder = card.querySelector('.cover-placeholder');
-  if (placeholder) {
-    placeholder.textContent = deriveInitial(book.name);
-  }
+  const metaInfo = card.querySelector('.meta-info');
+  const metaTag = card.querySelector('.meta-tag');
 
-  const img = card.querySelector('img');
-  if (img) {
-    img.alt = `${book.name} 封面`;
-  }
-
-  const titleEl = card.querySelector('.book-title');
-  if (titleEl) {
-    titleEl.textContent = book.name;
-  }
-
-  const metaEl = card.querySelector('.book-meta');
-  if (metaEl) {
-    const sizeLine = formatFileSize(book.size);
-    const addedLine = book.addedAt ? new Date(book.addedAt).toLocaleString('zh-CN', { month: 'short', day: 'numeric' }) : '';
-    const location = book.path.split(/[\\/]/).slice(0, -1).join('/') || '书架根目录';
-    metaEl.innerHTML = '';
-
-    const locationSpan = document.createElement('span');
-    locationSpan.textContent = location;
-    locationSpan.title = book.path;
-
-    const detailSpan = document.createElement('span');
-    detailSpan.textContent = addedLine ? `${sizeLine} · 添加于 ${addedLine}` : sizeLine;
-
-    metaEl.appendChild(locationSpan);
-    metaEl.appendChild(detailSpan);
-  }
-
-  renderTags(book, card.querySelector('.book-tags'));
+  const history = state.readingHistory[book.path];
 
   if (state.lastReadBook && state.lastReadBook.path === book.path) {
-    card.classList.add('book-card--last-read');
+    metaTag.textContent = '上次阅读';
+    metaTag.className = 'qd-tag reading';
+    metaInfo.textContent = formatTimeAgo(history?.lastReadTime);
+  } else if (history?.lastReadTime) {
+    metaInfo.textContent = formatTimeAgo(history.lastReadTime) + '读过';
+  } else {
+    metaInfo.textContent = '未读';
   }
 
-  const deleteBtn = card.querySelector('.delete-btn');
-  if (deleteBtn) {
-    deleteBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      handleDeleteBook(book);
-    });
-  }
+  const deleteBtn = card.querySelector('.qd-delete-btn');
+  deleteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    handleDeleteBook(book);
+  });
 
   card.addEventListener('click', () => {
     const url = new URL('reader.html', window.location.href);
     url.searchParams.set('path', book.path);
     url.searchParams.set('name', book.name);
-    if (state.theme) {
-      url.searchParams.set('theme', state.theme);
-    }
     window.location.href = url.toString();
-  });
-
-  card.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      card.click();
-    }
   });
 
   loadCover(book, card);
@@ -335,7 +187,6 @@ function createBookCard(book) {
 function renderBookshelf() {
   if (!els.grid) return;
   const sorted = sortBooks(filterBooks(state.books));
-  state.filtered = sorted;
   els.grid.innerHTML = '';
 
   if (sorted.length === 0) {
@@ -353,45 +204,38 @@ function renderBookshelf() {
 }
 
 async function handleDeleteBook(book) {
-  const confirmed = window.confirm(`确认删除《${book.name}》?\n该操作会从磁盘移除该文件。`);
-  if (!confirmed) return;
+  if (!confirm(`确认删除《${book.name}》?`)) return;
   try {
-    const response = await fetch(`${CONFIG.SERVER_API.BOOK}?path=${encodeURIComponent(book.path)}`, {
-      method: 'DELETE'
-    });
-    if (!response.ok) throw new Error('删除失败');
-    showToast(`已删除《${book.name}》`, 'success');
-    state.covers.delete(book.path);
+    const response = await fetch(`${CONFIG.SERVER_API.BOOK}?path=${encodeURIComponent(book.path)}`, { method: 'DELETE' });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: '未知错误' }));
+      throw new Error(error.error || '删除失败');
+    }
+    showToast('删除成功', 'success');
     await refreshBooks();
-  } catch (error) {
-    console.error(error);
-    showToast('删除书籍失败，请稍后重试', 'error');
+  } catch (e) {
+    console.error('删除书籍失败:', e);
+    showToast('删除失败: ' + e.message, 'error');
   }
 }
 
 async function uploadBooks(files) {
-  if (!files || files.length === 0) return;
+  if (!files.length) return;
   const formData = new FormData();
-  Array.from(files).forEach(file => formData.append('books', file));
+  Array.from(files).forEach(f => formData.append('books', f));
+
   try {
-    const response = await fetch(CONFIG.SERVER_API.UPLOAD, {
-      method: 'POST',
-      body: formData
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || '上传失败');
+    const res = await fetch(CONFIG.SERVER_API.UPLOAD, { method: 'POST', body: formData });
+    if (res.ok) {
+      showToast('上传成功', 'success');
+      await refreshBooks();
+    } else {
+      throw new Error('Upload failed');
     }
-    const result = await response.json();
-    showToast(result.message || '上传成功', 'success');
-    await refreshBooks();
-  } catch (error) {
-    console.error('Upload failed:', error);
-    showToast(error.message || '上传失败，请稍后再试', 'error');
+  } catch (e) {
+    showToast('上传失败', 'error');
   } finally {
-    if (els.fileInput) {
-      els.fileInput.value = '';
-    }
+    if (els.fileInput) els.fileInput.value = '';
   }
 }
 
@@ -402,88 +246,62 @@ async function refreshBooks() {
 }
 
 function setupEventListeners() {
-  if (els.sort) {
-    els.sort.addEventListener('change', () => {
-      state.sort = els.sort.value;
-      renderBookshelf();
+  if (els.sort) els.sort.addEventListener('change', () => {
+    state.sort = els.sort.value;
+    renderBookshelf();
+  });
+
+  if (els.search) els.search.addEventListener('input', () => {
+    state.search = els.search.value.trim();
+    renderBookshelf();
+  });
+
+  // 点击添加书籍按钮打开弹窗
+  if (els.addBtn) els.addBtn.addEventListener('click', openAddBooksModal);
+
+  // 保留原有的文件输入（用于拖拽上传）
+  if (els.fileInput) els.fileInput.addEventListener('change', (e) => uploadBooks(e.target.files));
+
+  if (els.themeToggle) els.themeToggle.addEventListener('click', () => {
+    applyTheme(state.theme === 'light' ? 'dark' : 'light');
+  });
+
+  // Drag and Drop（页面级别）
+  window.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    if (els.dragOverlay) els.dragOverlay.classList.add('active');
+  });
+
+  if (els.dragOverlay) {
+    els.dragOverlay.addEventListener('dragleave', (e) => {
+      if (e.target === els.dragOverlay) {
+        els.dragOverlay.classList.remove('active');
+      }
     });
-  }
 
-  if (els.search) {
-    els.search.addEventListener('input', () => {
-      state.search = els.search.value.trim().toLowerCase();
-      renderBookshelf();
-    });
-  }
+    els.dragOverlay.addEventListener('dragover', (e) => e.preventDefault());
 
-  const triggerUpload = () => {
-    els.fileInput?.click();
-  };
-
-  if (els.addBtn) {
-    els.addBtn.addEventListener('click', triggerUpload);
-  }
-
-  if (els.emptyAddBtn) {
-    els.emptyAddBtn.addEventListener('click', triggerUpload);
-  }
-
-  if (els.fileInput) {
-    els.fileInput.addEventListener('change', (event) => {
-      const input = event.target;
-      uploadBooks(input.files);
-    });
-  }
-
-  if (els.themeToggle) {
-    els.themeToggle.addEventListener('click', () => {
-      const next = state.theme === 'light' ? 'dark' : 'light';
-      applyTheme(next);
-    });
-  }
-
-  const dropZone = document.querySelector('.bookshelf-main');
-  if (dropZone) {
-    const prevent = (e) => {
+    els.dragOverlay.addEventListener('drop', (e) => {
       e.preventDefault();
-      e.stopPropagation();
-    };
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
-      dropZone.addEventListener(evt, prevent, false);
-    });
-    let dragDepth = 0;
-    dropZone.addEventListener('dragenter', () => {
-      dragDepth += 1;
-      dropZone.classList.add('drag-active');
-    });
-    dropZone.addEventListener('dragleave', () => {
-      dragDepth = Math.max(0, dragDepth - 1);
-      if (dragDepth === 0) {
-        dropZone.classList.remove('drag-active');
+      els.dragOverlay.classList.remove('active');
+      if (e.dataTransfer.files.length) {
+        uploadBooks(e.dataTransfer.files);
       }
-    });
-    dropZone.addEventListener('dragover', () => dropZone.classList.add('drag-active'));
-    dropZone.addEventListener('drop', (event) => {
-      const files = event.dataTransfer?.files;
-      if (files && files.length > 0) {
-        uploadBooks(files);
-      }
-      dragDepth = 0;
-      dropZone.classList.remove('drag-active');
     });
   }
+  
+  // 初始化添加书籍弹窗（传入上传处理函数）
+  initAddBooksModal(async (files) => {
+    await uploadBooks(files);
+  });
 }
 
 async function init() {
   loadLocalHistory();
-  await initializeTheme();
+  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'light';
+  applyTheme(savedTheme);
   setupEventListeners();
-  try {
-    await refreshBooks();
-  } catch (error) {
-    console.error(error);
-    showToast(error.message || '书架加载失败', 'error');
-  }
+  await refreshBooks();
 }
 
 init();

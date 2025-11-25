@@ -711,6 +711,61 @@
   border-color: var(--accent);
 }
 
+/* Font selector dropdown styles */
+.settings-select {
+  padding: 6px 28px 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-color);
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 140px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: all 0.2s;
+}
+.settings-select:hover {
+  border-color: var(--accent);
+}
+.settings-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.2);
+}
+.settings-select option {
+  padding: 8px;
+  background: var(--bg);
+  color: var(--text-color);
+}
+.settings-select optgroup {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.font-upload-row {
+  margin-top: 8px;
+}
+.upload-font-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.font-upload-status {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.font-upload-status.success {
+  color: #22c55e;
+}
+.font-upload-status.error {
+  color: #ef4444;
+}
+
 .settings-actions {
   margin-top: 20px;
   padding-top: 16px;
@@ -843,5 +898,432 @@
   }
   .settings-nav-item span {
     display: none;
+  }
+}
+
+/* ========== 添加书籍弹窗 ========== */
+.add-books-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.add-books-mask.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.add-books-modal {
+  background: var(--bg, #fff);
+  border: 1px solid var(--border-color, #e6e6e6);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 540px;
+  max-height: 85vh;
+  overflow: hidden;
+  transform: scale(0.9) translateY(20px);
+  transition: transform 0.25s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.add-books-mask.show .add-books-modal {
+  transform: scale(1) translateY(0);
+}
+
+.add-books-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color, #e6e6e6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.add-books-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-color, #262626);
+  margin: 0;
+}
+
+.add-books-close {
+  background: none;
+  border: none;
+  color: var(--muted, #999);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-books-close:hover {
+  background: var(--hover-bg, #f5f5f5);
+  color: var(--text-color, #262626);
+}
+
+.add-books-body {
+  padding: 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Drop Zone */
+.drop-zone {
+  border: 2px dashed var(--border-color, #d9d9d9);
+  border-radius: 12px;
+  padding: 40px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--bg-secondary, #fafafa);
+  margin-bottom: 20px;
+}
+
+.drop-zone:hover,
+.drop-zone.drag-over {
+  border-color: var(--qd-red, #bf2c24);
+  background: rgba(191, 44, 36, 0.05);
+}
+
+.drop-zone-icon {
+  color: var(--muted, #999);
+  margin-bottom: 16px;
+  transition: all 0.2s;
+}
+
+.drop-zone:hover .drop-zone-icon,
+.drop-zone.drag-over .drop-zone-icon {
+  color: var(--qd-red, #bf2c24);
+  transform: translateY(-4px);
+}
+
+.drop-zone-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-color, #333);
+  margin: 0 0 4px 0;
+}
+
+.drop-zone-hint {
+  font-size: 14px;
+  color: var(--muted, #999);
+  margin: 0 0 16px 0;
+}
+
+.select-files-btn {
+  background: var(--qd-red, #bf2c24);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-bottom: 12px;
+}
+
+.select-files-btn:hover {
+  background: var(--qd-dark-red, #a01f18);
+}
+
+.drop-zone-formats {
+  font-size: 12px;
+  color: var(--muted, #999);
+  margin: 0;
+}
+
+/* Files Section */
+.files-section {
+  background: var(--bg-secondary, #fafafa);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.files-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.files-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color, #333);
+}
+
+.clear-files-btn {
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--muted, #999);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.clear-files-btn:hover {
+  color: var(--qd-red, #bf2c24);
+  background: var(--hover-bg, #f0f0f0);
+}
+
+.files-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.files-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--muted, #999);
+  font-size: 14px;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg, #fff);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: background 0.2s;
+}
+
+.file-item:last-child {
+  margin-bottom: 0;
+}
+
+.file-item:hover {
+  background: var(--hover-bg, #f5f5f5);
+}
+
+.file-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.file-icon.epub {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.file-icon.txt {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: white;
+}
+
+.file-icon.pdf {
+  background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+  color: white;
+}
+
+.file-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-color, #333);
+  margin: 0 0 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-size {
+  font-size: 12px;
+  color: var(--muted, #999);
+  margin: 0;
+}
+
+.file-remove {
+  background: none;
+  border: none;
+  color: var(--muted, #999);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-remove:hover {
+  color: var(--qd-red, #bf2c24);
+  background: rgba(191, 44, 36, 0.1);
+}
+
+/* Footer */
+.add-books-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-color, #e6e6e6);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.add-books-btn {
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.add-books-btn.cancel {
+  background: var(--bg-secondary, #f5f5f5);
+  color: var(--text-color, #333);
+}
+
+.add-books-btn.cancel:hover {
+  background: var(--hover-bg, #e8e8e8);
+}
+
+.add-books-btn.confirm {
+  background: var(--qd-red, #bf2c24);
+  color: white;
+  min-width: 120px;
+}
+
+.add-books-btn.confirm:hover:not(:disabled) {
+  background: var(--qd-dark-red, #a01f18);
+}
+
+.add-books-btn.confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-loading .spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Dark mode support for add books modal */
+body.dark-mode .add-books-modal {
+  background: #2a2a2a;
+  border-color: #3a3a3a;
+}
+
+body.dark-mode .add-books-header {
+  border-color: #3a3a3a;
+}
+
+body.dark-mode .add-books-title {
+  color: #e0e0e0;
+}
+
+body.dark-mode .drop-zone {
+  background: #1f1f1f;
+  border-color: #444;
+}
+
+body.dark-mode .drop-zone:hover,
+body.dark-mode .drop-zone.drag-over {
+  border-color: #bf2c24;
+  background: rgba(191, 44, 36, 0.1);
+}
+
+body.dark-mode .drop-zone-text {
+  color: #e0e0e0;
+}
+
+body.dark-mode .files-section {
+  background: #1f1f1f;
+}
+
+body.dark-mode .files-title {
+  color: #e0e0e0;
+}
+
+body.dark-mode .file-item {
+  background: #2a2a2a;
+}
+
+body.dark-mode .file-item:hover {
+  background: #333;
+}
+
+body.dark-mode .file-name {
+  color: #e0e0e0;
+}
+
+body.dark-mode .add-books-footer {
+  border-color: #3a3a3a;
+}
+
+body.dark-mode .add-books-btn.cancel {
+  background: #333;
+  color: #e0e0e0;
+}
+
+body.dark-mode .add-books-btn.cancel:hover {
+  background: #444;
+}
+
+@media (max-width: 600px) {
+  .add-books-modal {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 16px 16px 0 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+  
+  .add-books-mask {
+    align-items: flex-end;
+    padding: 0;
+  }
+  
+  .drop-zone {
+    padding: 30px 16px;
+  }
+  
+  .files-list {
+    max-height: 150px;
   }
 }

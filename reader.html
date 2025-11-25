@@ -234,6 +234,33 @@
               </div>
             </div>
             
+            <div class="settings-subsection">
+              <h4>字体设置</h4>
+              <div class="settings-row">
+                <span class="settings-label">阅读字体</span>
+                <div class="settings-control">
+                  <select id="fontSelector" class="settings-select">
+                    <!-- 字体选项由JS动态生成 -->
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row font-upload-row">
+                <span class="settings-label">自定义字体</span>
+                <div class="settings-control">
+                  <input type="file" id="fontFileInput" accept=".ttf,.otf,.woff,.woff2" hidden />
+                  <button id="uploadFontBtn" class="settings-mini-btn upload-font-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="17 8 12 3 7 8"></polyline>
+                      <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    上传
+                  </button>
+                  <span id="fontUploadStatus" class="font-upload-status"></span>
+                </div>
+              </div>
+            </div>
+            
             <div class="settings-actions">
               <button id="resetReadingPrefsBtn" class="settings-reset-btn">恢复默认设置</button>
             </div>

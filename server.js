@@ -1,67 +1,35 @@
-// server.js
+// server.js - Local E-Book Reader Server
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const AdmZip = require('adm-zip');
+
 const app = express();
-const port = 3000;
+const PORT = 3000;
 
-const booksDirectory = path.join(__dirname, 'books');
-const configDirectory = path.join(__dirname, 'user-data');
+// 目录配置
+const DIRS = {
+  books: path.join(__dirname, 'books'),
+  config: path.join(__dirname, 'user-data'),
+  fonts: path.join(__dirname, 'user-data', 'fonts')
+};
 
-// 确保目录存在
-if (!fs.existsSync(booksDirectory)) {
-  fs.mkdirSync(booksDirectory);
-}
-if (!fs.existsSync(configDirectory)) {
-  fs.mkdirSync(configDirectory);
-}
+// 支持的文件扩展名
+const ALLOWED_EXTENSIONS = ['.epub', '.txt', '.pdf'];
 
-// 中间件：解析JSON请求体
-app.use(express.json({ limit: '10mb' }));
+// 支持的字体扩展名
+const ALLOWED_FONT_EXTENSIONS = ['.ttf', '.otf', '.woff', '.woff2'];
 
-// 配置multer用于文件上传
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    if (!fs.existsSync(booksDirectory)) {
-      fs.mkdirSync(booksDirectory, { recursive: true });
-    }
-    cb(null, booksDirectory);
-  },
-  filename: function (req, file, cb) {
-    // 保持原文件名，如果文件已存在则添加数字后缀
-    const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
-    let finalName = originalName;
-    let counter = 1;
-    
-    while (fs.existsSync(path.join(booksDirectory, finalName))) {
-      const ext = path.extname(originalName);
-      const nameWithoutExt = path.basename(originalName, ext);
-      finalName = `${nameWithoutExt}(${counter})${ext}`;
-      counter++;
-    }
-    
-    cb(null, finalName);
-  }
-});
+// 字体MIME类型映射
+const FONT_MIME_TYPES = {
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2'
+};
 
-const upload = multer({ 
-  storage: storage,
-  fileFilter: function (req, file, cb) {
-    const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
-    const allowedExtensions = ['.epub', '.txt', '.pdf'];
-    const ext = path.extname(originalName).toLowerCase();
-    
-    if (allowedExtensions.includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error('只支持 .epub, .txt, .pdf 文件格式'));
-    }
-  }
-});
-
-// 递归地读取目录中的所有书籍文件
+// 图片MIME类型映射
 const IMAGE_MIME_TYPES = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -70,38 +38,100 @@ const IMAGE_MIME_TYPES = {
   '.webp': 'image/webp'
 };
 
+// 封面缓存
 const coverCache = new Map();
 
-const normalizeRelativePath = (p = '') => p.split(path.sep).join('/');
-
-const resolveBookPath = (relativePath = '') => {
-  const normalized = path.normalize(relativePath).replace(/^([\.\\/])+/, '');
-  const resolved = path.resolve(booksDirectory, normalized);
-  const booksRoot = path.resolve(booksDirectory);
-  if (!resolved.toLowerCase().startsWith(booksRoot.toLowerCase())) {
-    throw new Error('Invalid book path');
+// 确保目录存在
+Object.values(DIRS).forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
-  return resolved;
-};
+});
 
-const cleanupEmptyFolders = (startPath) => {
-  let current = path.dirname(startPath);
-  const booksRoot = path.resolve(booksDirectory);
-  while (current.toLowerCase().startsWith(booksRoot.toLowerCase()) && current !== booksRoot) {
-    try {
-      const remaining = fs.readdirSync(current);
-      if (remaining.length === 0) {
-        fs.rmdirSync(current);
-        current = path.dirname(current);
-      } else {
+// 中间件配置
+app.use(express.json({ limit: '10mb' }));
+app.use(express.static(__dirname));
+
+// 工具函数
+const utils = {
+  // 规范化相对路径
+  normalizePath: (p = '') => p.split(path.sep).join('/'),
+  
+  // 解析书籍路径（带安全检查）
+  resolveBookPath: (relativePath = '') => {
+    const normalized = path.normalize(relativePath).replace(/^([\.\\/])+/, '');
+    const resolved = path.resolve(DIRS.books, normalized);
+    const booksRoot = path.resolve(DIRS.books);
+    if (!resolved.toLowerCase().startsWith(booksRoot.toLowerCase())) {
+      throw new Error('Invalid book path');
+    }
+    return resolved;
+  },
+  
+  // 清理空文件夹
+  cleanupEmptyFolders: (startPath) => {
+    let current = path.dirname(startPath);
+    const booksRoot = path.resolve(DIRS.books);
+    while (current.toLowerCase().startsWith(booksRoot.toLowerCase()) && current !== booksRoot) {
+      try {
+        if (fs.readdirSync(current).length === 0) {
+          fs.rmdirSync(current);
+          current = path.dirname(current);
+        } else {
+          break;
+        }
+      } catch {
         break;
       }
-    } catch (error) {
-      break;
     }
+  },
+  
+  // 解码文件名
+  decodeFilename: (filename) => Buffer.from(filename, 'latin1').toString('utf8'),
+  
+  // 检查文件扩展名是否支持
+  isAllowedExtension: (filename) => {
+    const ext = path.extname(filename).toLowerCase();
+    return ALLOWED_EXTENSIONS.includes(ext);
   }
 };
 
+// 文件上传配置
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    if (!fs.existsSync(DIRS.books)) {
+      fs.mkdirSync(DIRS.books, { recursive: true });
+    }
+    cb(null, DIRS.books);
+  },
+  filename: (req, file, cb) => {
+    const originalName = utils.decodeFilename(file.originalname);
+    let finalName = originalName;
+    let counter = 1;
+    
+    while (fs.existsSync(path.join(DIRS.books, finalName))) {
+      const ext = path.extname(originalName);
+      const nameWithoutExt = path.basename(originalName, ext);
+      finalName = `${nameWithoutExt}(${counter})${ext}`;
+      counter++;
+    }
+    cb(null, finalName);
+  }
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const originalName = utils.decodeFilename(file.originalname);
+    if (utils.isAllowedExtension(originalName)) {
+      cb(null, true);
+    } else {
+      cb(new Error('只支持 .epub, .txt, .pdf 文件格式'));
+    }
+  }
+});
+
+// EPUB封面提取
 const extractEpubCover = (absolutePath) => {
   try {
     const stats = fs.statSync(absolutePath);
@@ -146,6 +176,7 @@ const extractEpubCover = (absolutePath) => {
   }
 };
 
+// 递归查找书籍
 const findBooks = (dir, fileList = [], parentDir = '') => {
   const files = fs.readdirSync(dir);
 
@@ -156,12 +187,11 @@ const findBooks = (dir, fileList = [], parentDir = '') => {
 
     if (fileStat.isDirectory()) {
       findBooks(filePath, fileList, relativePath);
-    } else if (file.toLowerCase().endsWith('.epub') || file.toLowerCase().endsWith('.txt') || file.toLowerCase().endsWith('.pdf')) {
+    } else if (utils.isAllowedExtension(file)) {
       const ext = path.extname(file).toLowerCase();
-      const normalizedPath = normalizeRelativePath(relativePath);
       fileList.push({
         name: file,
-        path: normalizedPath,
+        path: utils.normalizePath(relativePath),
         extension: ext,
         size: fileStat.size,
         addedAt: fileStat.birthtimeMs || fileStat.ctimeMs,
@@ -174,13 +204,15 @@ const findBooks = (dir, fileList = [], parentDir = '') => {
   return fileList;
 };
 
-// API: 获取书架列表
+// ==================== API 路由 ====================
+
+// 获取书架列表
 app.get('/api/bookshelf', (req, res) => {
   try {
-    if (!fs.existsSync(booksDirectory)) {
-      fs.mkdirSync(booksDirectory);
+    if (!fs.existsSync(DIRS.books)) {
+      fs.mkdirSync(DIRS.books);
     }
-    const books = findBooks(booksDirectory);
+    const books = findBooks(DIRS.books);
     res.json(books);
   } catch (error) {
     console.error('Error reading bookshelf:', error);
@@ -188,7 +220,7 @@ app.get('/api/bookshelf', (req, res) => {
   }
 });
 
-// API: 获取书籍封面
+// 获取书籍封面
 app.get('/api/book-cover', (req, res) => {
   try {
     const relPath = req.query.path;
@@ -196,7 +228,7 @@ app.get('/api/book-cover', (req, res) => {
       return res.status(400).json({ error: '缺少书籍路径' });
     }
 
-    const absolutePath = resolveBookPath(relPath);
+    const absolutePath = utils.resolveBookPath(relPath);
     if (!fs.existsSync(absolutePath)) {
       return res.status(404).json({ error: '书籍不存在' });
     }
@@ -214,20 +246,17 @@ app.get('/api/book-cover', (req, res) => {
   }
 });
 
-// API: 保存用户配置
+// 保存用户配置
 app.post('/api/save-config', (req, res) => {
   try {
     const { config, filename } = req.body;
-    
     if (!config) {
       return res.status(400).json({ error: '配置数据不能为空' });
     }
-    
-    // 生成文件名（如果没有提供）
+
     const configFilename = filename || `reader-config-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-    const configPath = path.join(configDirectory, configFilename);
-    
-    // 添加元数据
+    const configPath = path.join(DIRS.config, configFilename);
+
     const configWithMeta = {
       ...config,
       metadata: {
@@ -237,139 +266,102 @@ app.post('/api/save-config', (req, res) => {
         appName: 'Local E-Book Reader'
       }
     };
-    
+
     fs.writeFileSync(configPath, JSON.stringify(configWithMeta, null, 2));
-    
-    res.json({ 
-      success: true, 
-      message: '配置保存成功',
-      filename: configFilename,
-      path: configPath
-    });
+    res.json({ success: true, message: '配置保存成功', filename: configFilename, path: configPath });
   } catch (error) {
     console.error('Error saving config:', error);
     res.status(500).json({ error: '保存配置失败: ' + error.message });
   }
 });
 
-// API: 加载用户配置
+// 加载用户配置
 app.get('/api/load-config/:filename', (req, res) => {
   try {
-    const filename = req.params.filename;
-    const configPath = path.join(configDirectory, filename);
-    
+    const configPath = path.join(DIRS.config, req.params.filename);
     if (!fs.existsSync(configPath)) {
       return res.status(404).json({ error: '配置文件不存在' });
     }
-    
-    const configData = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(configData);
-    
-    res.json({
-      success: true,
-      config: config,
-      filename: filename
-    });
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    res.json({ success: true, config, filename: req.params.filename });
   } catch (error) {
     console.error('Error loading config:', error);
     res.status(500).json({ error: '加载配置失败: ' + error.message });
   }
 });
 
-// API: 获取所有保存的配置文件列表
+// 获取配置文件列表
 app.get('/api/config-list', (req, res) => {
   try {
-    const files = fs.readdirSync(configDirectory)
+    const files = fs.readdirSync(DIRS.config)
       .filter(file => file.endsWith('.json'))
       .map(file => {
-        const filePath = path.join(configDirectory, file);
+        const filePath = path.join(DIRS.config, file);
         const stats = fs.statSync(filePath);
-        
-        // 尝试读取文件元数据
         let metadata = null;
         try {
-          const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-          metadata = content.metadata;
-        } catch (e) {
-          // 忽略解析错误
-        }
-        
+          metadata = JSON.parse(fs.readFileSync(filePath, 'utf8')).metadata;
+        } catch { /* ignore */ }
         return {
           filename: file,
           size: stats.size,
           createdAt: stats.birthtime.toISOString(),
           modifiedAt: stats.mtime.toISOString(),
-          metadata: metadata
+          metadata
         };
       })
-      .sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt)); // 按修改时间倒序
-    
-    res.json({
-      success: true,
-      configs: files
-    });
+      .sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt));
+    res.json({ success: true, configs: files });
   } catch (error) {
     console.error('Error listing configs:', error);
     res.status(500).json({ error: '获取配置列表失败: ' + error.message });
   }
 });
 
-// API: 删除配置文件
+// 删除配置文件
 app.delete('/api/config/:filename', (req, res) => {
   try {
-    const filename = req.params.filename;
-    const configPath = path.join(configDirectory, filename);
-    
+    const configPath = path.join(DIRS.config, req.params.filename);
     if (!fs.existsSync(configPath)) {
       return res.status(404).json({ error: '配置文件不存在' });
     }
-    
     fs.unlinkSync(configPath);
-    
-    res.json({
-      success: true,
-      message: '配置文件删除成功'
-    });
+    res.json({ success: true, message: '配置文件删除成功' });
   } catch (error) {
     console.error('Error deleting config:', error);
     res.status(500).json({ error: '删除配置失败: ' + error.message });
   }
 });
 
-// API: 下载配置文件
+// 下载配置文件
 app.get('/api/download-config/:filename', (req, res) => {
   try {
-    const filename = req.params.filename;
-    const configPath = path.join(configDirectory, filename);
-    
+    const configPath = path.join(DIRS.config, req.params.filename);
     if (!fs.existsSync(configPath)) {
       return res.status(404).json({ error: '配置文件不存在' });
     }
-    
-    res.download(configPath, filename);
+    res.download(configPath, req.params.filename);
   } catch (error) {
     console.error('Error downloading config:', error);
     res.status(500).json({ error: '下载配置失败: ' + error.message });
   }
 });
 
-// API: 上传书籍文件
+// 上传书籍文件
 app.post('/api/upload', upload.array('books'), (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: '没有选择文件' });
     }
-    
     const uploadedFiles = req.files.map(file => ({
-      originalName: Buffer.from(file.originalname, 'latin1').toString('utf8'),
+      originalName: utils.decodeFilename(file.originalname),
       savedName: file.filename,
       size: file.size
     }));
-    
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: `成功上传 ${uploadedFiles.length} 个文件`,
-      files: uploadedFiles 
+      files: uploadedFiles
     });
   } catch (error) {
     console.error('Error uploading files:', error);
@@ -377,45 +369,38 @@ app.post('/api/upload', upload.array('books'), (req, res) => {
   }
 });
 
-// API: 根据路径获取单本书籍的内容
+// 获取书籍内容
 app.get('/api/book', (req, res) => {
   const bookPath = req.query.path;
   if (!bookPath) {
     return res.status(400).send('Book path is required.');
   }
-
-  // 安全性检查：确保请求的文件路径在 `books` 目录内
-  let safePath;
   try {
-    safePath = resolveBookPath(bookPath);
+    const safePath = utils.resolveBookPath(bookPath);
+    if (fs.existsSync(safePath)) {
+      res.sendFile(safePath);
+    } else {
+      res.status(404).send('Book not found.');
+    }
   } catch (error) {
     return res.status(403).send('Forbidden.');
   }
-
-  if (fs.existsSync(safePath)) {
-    res.sendFile(safePath);
-  } else {
-    res.status(404).send('Book not found.');
-  }
 });
 
-// API: 删除书籍
+// 删除书籍
 app.delete('/api/book', (req, res) => {
   try {
     const relPath = req.query.path;
     if (!relPath) {
       return res.status(400).json({ error: '缺少书籍路径' });
     }
-
-    const absolutePath = resolveBookPath(relPath);
+    const absolutePath = utils.resolveBookPath(relPath);
     if (!fs.existsSync(absolutePath)) {
       return res.status(404).json({ error: '书籍不存在' });
     }
-
     fs.unlinkSync(absolutePath);
-    cleanupEmptyFolders(absolutePath);
+    utils.cleanupEmptyFolders(absolutePath);
     coverCache.delete(absolutePath);
-
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting book:', error);
@@ -423,10 +408,162 @@ app.delete('/api/book', (req, res) => {
   }
 });
 
-// 托管前端静态文件 (index.html)
-app.use(express.static(path.join(__dirname)));
+// ==================== 字体管理 API ====================
 
-app.listen(port, () => {
-  console.log(`E-book reader server listening at http://localhost:${port}`);
-  console.log(`Place your .epub, .txt and .pdf files in the "${booksDirectory}" folder.`);
+// 字体上传配置
+const fontStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    if (!fs.existsSync(DIRS.fonts)) {
+      fs.mkdirSync(DIRS.fonts, { recursive: true });
+    }
+    cb(null, DIRS.fonts);
+  },
+  filename: (req, file, cb) => {
+    const originalName = utils.decodeFilename(file.originalname);
+    let finalName = originalName;
+    let counter = 1;
+    
+    while (fs.existsSync(path.join(DIRS.fonts, finalName))) {
+      const ext = path.extname(originalName);
+      const nameWithoutExt = path.basename(originalName, ext);
+      finalName = `${nameWithoutExt}(${counter})${ext}`;
+      counter++;
+    }
+    cb(null, finalName);
+  }
+});
+
+const fontUpload = multer({
+  storage: fontStorage,
+  fileFilter: (req, file, cb) => {
+    const originalName = utils.decodeFilename(file.originalname);
+    const ext = path.extname(originalName).toLowerCase();
+    if (ALLOWED_FONT_EXTENSIONS.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('只支持 .ttf, .otf, .woff, .woff2 字体格式'));
+    }
+  },
+  limits: {
+    fileSize: 20 * 1024 * 1024 // 20MB 限制
+  }
+});
+
+// 获取字体列表
+app.get('/api/fonts', (req, res) => {
+  try {
+    if (!fs.existsSync(DIRS.fonts)) {
+      return res.json([]);
+    }
+    
+    const files = fs.readdirSync(DIRS.fonts);
+    const fonts = files
+      .filter(file => ALLOWED_FONT_EXTENSIONS.includes(path.extname(file).toLowerCase()))
+      .map(file => {
+        const ext = path.extname(file);
+        const nameWithoutExt = path.basename(file, ext);
+        const stats = fs.statSync(path.join(DIRS.fonts, file));
+        
+        return {
+          id: file,
+          name: nameWithoutExt,
+          fontFamily: `CustomFont_${nameWithoutExt.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          filename: file,
+          size: stats.size,
+          addedAt: stats.birthtimeMs || stats.ctimeMs
+        };
+      });
+    
+    res.json(fonts);
+  } catch (error) {
+    console.error('Error getting fonts:', error);
+    res.status(500).json({ error: '获取字体列表失败' });
+  }
+});
+
+// 上传字体
+app.post('/api/fonts/upload', fontUpload.single('font'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: '没有上传文件' });
+    }
+    
+    const ext = path.extname(req.file.filename);
+    const nameWithoutExt = path.basename(req.file.filename, ext);
+    
+    res.json({
+      success: true,
+      font: {
+        id: req.file.filename,
+        name: nameWithoutExt,
+        fontFamily: `CustomFont_${nameWithoutExt.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        filename: req.file.filename,
+        size: req.file.size
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading font:', error);
+    res.status(500).json({ error: '上传字体失败: ' + error.message });
+  }
+});
+
+// 获取字体文件
+app.get('/api/fonts/file/:fontId', (req, res) => {
+  try {
+    const fontId = req.params.fontId;
+    const fontPath = path.join(DIRS.fonts, fontId);
+    
+    // 安全检查
+    const resolved = path.resolve(fontPath);
+    if (!resolved.startsWith(path.resolve(DIRS.fonts))) {
+      return res.status(403).json({ error: '无效的字体路径' });
+    }
+    
+    if (!fs.existsSync(fontPath)) {
+      return res.status(404).json({ error: '字体不存在' });
+    }
+    
+    const ext = path.extname(fontId).toLowerCase();
+    const mimeType = FONT_MIME_TYPES[ext] || 'application/octet-stream';
+    
+    res.set({
+      'Content-Type': mimeType,
+      'Cache-Control': 'public, max-age=31536000'
+    });
+    
+    res.sendFile(fontPath);
+  } catch (error) {
+    console.error('Error serving font:', error);
+    res.status(500).json({ error: '获取字体失败' });
+  }
+});
+
+// 删除字体
+app.delete('/api/fonts/:fontId', (req, res) => {
+  try {
+    const fontId = req.params.fontId;
+    const fontPath = path.join(DIRS.fonts, fontId);
+    
+    // 安全检查
+    const resolved = path.resolve(fontPath);
+    if (!resolved.startsWith(path.resolve(DIRS.fonts))) {
+      return res.status(403).json({ error: '无效的字体路径' });
+    }
+    
+    if (!fs.existsSync(fontPath)) {
+      return res.status(404).json({ error: '字体不存在' });
+    }
+    
+    fs.unlinkSync(fontPath);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting font:', error);
+    res.status(500).json({ error: '删除字体失败: ' + error.message });
+  }
+});
+
+// 启动服务器
+app.listen(PORT, () => {
+  console.log(`E-book reader server listening at http://localhost:${PORT}`);
+  console.log(`Place your .epub, .txt and .pdf files in the "${DIRS.books}" folder.`);
 });

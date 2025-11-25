@@ -1,53 +1,12 @@
 // Configuration management module
 import { state, updateState } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
-
-const defaultReadingPrefs = {
-  paraSpacing: 1,
-  letterSpacing: 0.2,
-  lineHeight: 1.8,
-  pageWidth: 800,
-  pagePadding: 40,
-  progressBarEnabled: true
-};
-
-function computeVerticalPadding(horizontalPadding) {
-  const horizontal = Number(horizontalPadding);
-  if (!Number.isFinite(horizontal)) {
-    return Math.round(defaultReadingPrefs.pagePadding * 0.75);
-  }
-  return Math.max(8, Math.round(horizontal * 0.75));
-}
-
-function normalizeReadingPrefs(raw = {}) {
-  const merged = { ...defaultReadingPrefs, ...raw };
-  const clamp = (value, min, max, fallback) => {
-    const num = Number(value);
-    if (Number.isFinite(num)) {
-      return Math.min(Math.max(num, min), max);
-    }
-    return fallback;
-  };
-
-  return {
-    paraSpacing: clamp(merged.paraSpacing, 0.2, 4, defaultReadingPrefs.paraSpacing),
-    letterSpacing: clamp(merged.letterSpacing, 0, 5, defaultReadingPrefs.letterSpacing),
-    lineHeight: clamp(merged.lineHeight, 1.0, 3.5, defaultReadingPrefs.lineHeight),
-  pageWidth: Math.round(clamp(merged.pageWidth, 400, 2000, defaultReadingPrefs.pageWidth)),
-  pagePadding: Math.round(clamp(merged.pagePadding, 10, 150, defaultReadingPrefs.pagePadding)),
-    progressBarEnabled: merged.progressBarEnabled !== false
-  };
-}
-
-function applyProgressBarDisplay(enabled) {
-  const display = enabled ? '' : 'none';
-  Array.from(document.querySelectorAll('#readingProgress, .reading-progress, .top-progress')).forEach(el => {
-    el.style.display = display;
-  });
-  Array.from(document.querySelectorAll('#readingProgressBar, .reading-progress__bar, .progress-bar')).forEach(el => {
-    el.style.display = display;
-  });
-}
+import { 
+  normalizePrefs, 
+  computeVerticalPadding, 
+  formatDecimal, 
+  applyProgressBarPreference 
+} from '../core/utils.js';
 
 // 配置管理器
 export class ConfigManager {
@@ -99,10 +58,10 @@ export class ConfigManager {
   getReadingPrefs() {
     try {
       const raw = localStorage.getItem('reader_prefs_v1');
-      if (!raw) return normalizeReadingPrefs();
-      return normalizeReadingPrefs(JSON.parse(raw));
+      if (!raw) return normalizePrefs();
+      return normalizePrefs(JSON.parse(raw));
     } catch (e) {
-      return normalizeReadingPrefs();
+      return normalizePrefs();
     }
   }
 
@@ -224,7 +183,7 @@ export class ConfigManager {
 
       // 应用阅读偏好
       if (config.readingPrefs) {
-        const normalizedPrefs = normalizeReadingPrefs(config.readingPrefs);
+        const normalizedPrefs = normalizePrefs(config.readingPrefs);
         localStorage.setItem('reader_prefs_v1', JSON.stringify(normalizedPrefs));
         this.applyReadingPrefs(normalizedPrefs);
       }
@@ -284,59 +243,60 @@ export class ConfigManager {
 
   // 应用阅读偏好
   applyReadingPrefs(prefs) {
-    const normalized = normalizeReadingPrefs(prefs);
+    const normalized = normalizePrefs(prefs);
+    const verticalPadding = computeVerticalPadding(normalized.pagePadding);
+    
     document.documentElement.style.setProperty('--para-spacing', String(normalized.paraSpacing));
     document.documentElement.style.setProperty('--letter-spacing', `${normalized.letterSpacing}px`);
     document.documentElement.style.setProperty('--line-height', String(normalized.lineHeight));
     document.documentElement.style.setProperty('--page-width', `${normalized.pageWidth}px`);
     document.documentElement.style.setProperty('--page-padding-x', `${normalized.pagePadding}px`);
-    document.documentElement.style.setProperty('--page-padding-y', `${computeVerticalPadding(normalized.pagePadding)}px`);
+    document.documentElement.style.setProperty('--page-padding-y', `${verticalPadding}px`);
 
-    const paraSpacingInput = document.getElementById('paraSpacingInput');
-    const letterSpacingInput = document.getElementById('letterSpacingInput');
-    const lineHeightInput = document.getElementById('lineHeightInput');
-    const pageWidthInput = document.getElementById('pageWidthInput');
-    const pageMarginInput = document.getElementById('pageMarginInput');
+    // 更新UI控件
+    const inputs = {
+      paraSpacing: document.getElementById('paraSpacingInput'),
+      letterSpacing: document.getElementById('letterSpacingInput'),
+      lineHeight: document.getElementById('lineHeightInput'),
+      pageWidth: document.getElementById('pageWidthInput'),
+      pagePadding: document.getElementById('pageMarginInput')
+    };
+    
+    const values = {
+      paraSpacing: document.getElementById('paraSpacingVal'),
+      letterSpacing: document.getElementById('letterSpacingVal'),
+      lineHeight: document.getElementById('lineHeightVal'),
+      pageWidth: document.getElementById('pageWidthVal'),
+      pagePadding: document.getElementById('pageMarginVal')
+    };
 
-    const paraSpacingVal = document.getElementById('paraSpacingVal');
-    const letterSpacingVal = document.getElementById('letterSpacingVal');
-    const lineHeightVal = document.getElementById('lineHeightVal');
-    const pageWidthVal = document.getElementById('pageWidthVal');
-    const pageMarginVal = document.getElementById('pageMarginVal');
+    if (inputs.paraSpacing) {
+      inputs.paraSpacing.value = String(normalized.paraSpacing);
+      if (values.paraSpacing) values.paraSpacing.textContent = formatDecimal(normalized.paraSpacing);
+    }
+    if (inputs.letterSpacing) {
+      inputs.letterSpacing.value = String(normalized.letterSpacing);
+      if (values.letterSpacing) values.letterSpacing.textContent = `${formatDecimal(normalized.letterSpacing)}px`;
+    }
+    if (inputs.lineHeight) {
+      inputs.lineHeight.value = String(normalized.lineHeight);
+      if (values.lineHeight) values.lineHeight.textContent = formatDecimal(normalized.lineHeight);
+    }
+    if (inputs.pageWidth) {
+      inputs.pageWidth.value = String(normalized.pageWidth);
+      if (values.pageWidth) values.pageWidth.textContent = `${Math.round(normalized.pageWidth)}px`;
+    }
+    if (inputs.pagePadding) {
+      inputs.pagePadding.value = String(normalized.pagePadding);
+      if (values.pagePadding) values.pagePadding.textContent = `${Math.round(normalized.pagePadding)}px`;
+    }
+
     const progressToggle = document.getElementById('progressBarToggle');
-
-    const formatDecimal = (value) => Number(value).toFixed(2).replace(/\.0+$/, '').replace(/\.([1-9])0$/, '.$1');
-
-    if (paraSpacingInput) {
-      paraSpacingInput.value = String(normalized.paraSpacing);
-      if (paraSpacingVal) paraSpacingVal.textContent = formatDecimal(normalized.paraSpacing);
-    }
-
-    if (letterSpacingInput) {
-      letterSpacingInput.value = String(normalized.letterSpacing);
-      if (letterSpacingVal) letterSpacingVal.textContent = `${formatDecimal(normalized.letterSpacing)}px`;
-    }
-
-    if (lineHeightInput) {
-      lineHeightInput.value = String(normalized.lineHeight);
-      if (lineHeightVal) lineHeightVal.textContent = formatDecimal(normalized.lineHeight);
-    }
-
-    if (pageWidthInput) {
-      pageWidthInput.value = String(normalized.pageWidth);
-      if (pageWidthVal) pageWidthVal.textContent = `${Math.round(normalized.pageWidth)}px`;
-    }
-
-    if (pageMarginInput) {
-      pageMarginInput.value = String(normalized.pagePadding);
-      if (pageMarginVal) pageMarginVal.textContent = `${Math.round(normalized.pagePadding)}px`;
-    }
-
     if (progressToggle) {
       progressToggle.checked = normalized.progressBarEnabled !== false;
     }
 
-    applyProgressBarDisplay(normalized.progressBarEnabled !== false);
+    applyProgressBarPreference(normalized.progressBarEnabled !== false);
   }
 
   // 更新主题UI
