@@ -1,4 +1,5 @@
 import { CONFIG } from './core/config.js';
+import { formatTimeAgo, formatFileSize, getFileExtension } from './core/utils.js';
 
 const state = {
   books: [],
@@ -9,6 +10,12 @@ const state = {
   readingHistory: {},
   lastReadBook: null,
   theme: 'light'
+};
+
+// 添加书籍弹窗状态
+const addBooksModalState = {
+  files: [],
+  isUploading: false
 };
 
 const els = {
@@ -22,7 +29,17 @@ const els = {
   fileInput: document.getElementById('bookFileInput'),
   toast: document.getElementById('toast'),
   template: document.getElementById('bookCardTemplate'),
-  dragOverlay: document.getElementById('dragOverlay')
+  dragOverlay: document.getElementById('dragOverlay'),
+  // 弹窗元素
+  addBooksMask: document.getElementById('addBooksMask'),
+  addBooksClose: document.getElementById('addBooksClose'),
+  dropZone: document.getElementById('dropZone'),
+  selectFilesBtn: document.getElementById('selectFilesBtn'),
+  fileInputModal: document.getElementById('fileInputModal'),
+  clearFilesBtn: document.getElementById('clearFilesBtn'),
+  cancelAddBtn: document.getElementById('cancelAddBtn'),
+  confirmAddBtn: document.getElementById('confirmAddBtn'),
+  filesList: document.getElementById('filesList')
 };
 
 const THEME_STORAGE_KEY = 'local_reader_theme';
@@ -36,19 +53,6 @@ function showToast(message, type = 'info') {
   showToast._timer = setTimeout(() => {
     els.toast.classList.remove('show');
   }, 2500);
-}
-
-function formatTimeAgo(timestamp) {
-  if (!timestamp) return '';
-  const diff = Date.now() - Number(timestamp);
-  const minute = 60 * 1000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-
-  if (diff < minute) return '刚刚';
-  if (diff < hour) return `${Math.floor(diff / minute)}分钟前`;
-  if (diff < day) return `${Math.floor(diff / hour)}小时前`;
-  return `${Math.floor(diff / day)}天前`;
 }
 
 function loadLocalHistory() {
@@ -251,6 +255,224 @@ async function refreshBooks() {
   renderBookshelf();
 }
 
+/* ========== 添加书籍弹窗 ========== */
+
+function openAddBooksModal() {
+  if (els.addBooksMask) {
+    addBooksModalState.files = [];
+    addBooksModalState.isUploading = false;
+    updateFilesDisplay();
+    updateConfirmButton();
+    els.addBooksMask.classList.add('show');
+  }
+}
+
+function closeAddBooksModal() {
+  if (els.addBooksMask) {
+    els.addBooksMask.classList.remove('show');
+    addBooksModalState.files = [];
+    addBooksModalState.isUploading = false;
+  }
+}
+
+function handleModalDragOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+}
+
+function handleModalDragEnter(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add('drag-over');
+}
+
+function handleModalDragLeave(event) {
+  event.preventDefault();
+  if (!event.currentTarget.contains(event.relatedTarget)) {
+    event.currentTarget.classList.remove('drag-over');
+  }
+}
+
+function handleModalDrop(event) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over');
+  const files = Array.from(event.dataTransfer.files);
+  addFilesToModal(files);
+}
+
+function handleModalFileSelect(event) {
+  const files = Array.from(event.target.files);
+  addFilesToModal(files);
+  event.target.value = '';
+}
+
+function addFilesToModal(files) {
+  const supportedFiles = files.filter(file => {
+    const ext = file.name.toLowerCase();
+    return ext.endsWith('.epub') || ext.endsWith('.txt') || ext.endsWith('.pdf');
+  });
+
+  if (supportedFiles.length === 0) {
+    showToast('请选择 .epub、.txt 或 .pdf 格式的文件', 'error');
+    return;
+  }
+
+  if (supportedFiles.length !== files.length) {
+    const skipped = files.length - supportedFiles.length;
+    showToast(`已忽略 ${skipped} 个不支持的文件`, 'info');
+  }
+
+  supportedFiles.forEach(file => {
+    const exists = addBooksModalState.files.some(f => 
+      f.name === file.name && f.size === file.size
+    );
+    if (!exists) {
+      addBooksModalState.files.push(file);
+    }
+  });
+
+  updateFilesDisplay();
+  updateConfirmButton();
+}
+
+function updateFilesDisplay() {
+  if (!els.filesList) return;
+
+  if (addBooksModalState.files.length === 0) {
+    els.filesList.innerHTML = `<div class="files-empty"><p>还没有选择任何文件</p></div>`;
+    return;
+  }
+
+  els.filesList.innerHTML = addBooksModalState.files.map((file, index) => {
+    const ext = getFileExtension(file.name);
+    const size = formatFileSize(file.size);
+    
+    return `
+      <div class="file-item">
+        <div class="file-icon ${ext}">${ext}</div>
+        <div class="file-info">
+          <p class="file-name" title="${file.name}">${file.name}</p>
+          <p class="file-size">${size}</p>
+        </div>
+        <button class="file-remove" data-index="${index}" title="移除">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    `;
+  }).join('');
+  
+  // 绑定移除按钮事件
+  els.filesList.querySelectorAll('.file-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(e.currentTarget.dataset.index, 10);
+      removeFileFromModal(index);
+    });
+  });
+}
+
+function removeFileFromModal(index) {
+  addBooksModalState.files.splice(index, 1);
+  updateFilesDisplay();
+  updateConfirmButton();
+}
+
+function updateConfirmButton() {
+  if (!els.confirmAddBtn) return;
+
+  const hasFiles = addBooksModalState.files.length > 0;
+  const isUploading = addBooksModalState.isUploading;
+  
+  els.confirmAddBtn.disabled = !hasFiles || isUploading;
+  
+  const btnText = els.confirmAddBtn.querySelector('.btn-text');
+  const btnLoading = els.confirmAddBtn.querySelector('.btn-loading');
+  
+  if (btnText && btnLoading) {
+    if (isUploading) {
+      btnText.style.display = 'none';
+      btnLoading.style.display = 'flex';
+    } else {
+      btnText.style.display = 'block';
+      btnLoading.style.display = 'none';
+      btnText.textContent = hasFiles ? `添加 ${addBooksModalState.files.length} 个书籍` : '添加书籍';
+    }
+  }
+}
+
+async function handleConfirmAdd() {
+  if (addBooksModalState.files.length === 0 || addBooksModalState.isUploading) return;
+
+  addBooksModalState.isUploading = true;
+  updateConfirmButton();
+
+  try {
+    await uploadBooks(addBooksModalState.files);
+    setTimeout(() => closeAddBooksModal(), 500);
+  } catch (error) {
+    addBooksModalState.isUploading = false;
+    updateConfirmButton();
+  }
+}
+
+function initAddBooksModal() {
+  if (els.addBooksClose) {
+    els.addBooksClose.addEventListener('click', closeAddBooksModal);
+  }
+  
+  if (els.cancelAddBtn) {
+    els.cancelAddBtn.addEventListener('click', closeAddBooksModal);
+  }
+
+  if (els.addBooksMask) {
+    els.addBooksMask.addEventListener('click', (e) => {
+      if (e.target === els.addBooksMask) closeAddBooksModal();
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && els.addBooksMask && els.addBooksMask.classList.contains('show')) {
+      closeAddBooksModal();
+    }
+  });
+
+  if (els.dropZone) {
+    els.dropZone.addEventListener('click', (e) => {
+      if (e.target !== els.selectFilesBtn && els.fileInputModal) {
+        els.fileInputModal.click();
+      }
+    });
+    els.dropZone.addEventListener('dragover', handleModalDragOver);
+    els.dropZone.addEventListener('dragenter', handleModalDragEnter);
+    els.dropZone.addEventListener('dragleave', handleModalDragLeave);
+    els.dropZone.addEventListener('drop', handleModalDrop);
+  }
+
+  if (els.selectFilesBtn) {
+    els.selectFilesBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (els.fileInputModal) els.fileInputModal.click();
+    });
+  }
+
+  if (els.fileInputModal) {
+    els.fileInputModal.addEventListener('change', handleModalFileSelect);
+  }
+  
+  if (els.clearFilesBtn) {
+    els.clearFilesBtn.addEventListener('click', () => {
+      addBooksModalState.files = [];
+      updateFilesDisplay();
+      updateConfirmButton();
+    });
+  }
+  
+  if (els.confirmAddBtn) {
+    els.confirmAddBtn.addEventListener('click', handleConfirmAdd);
+  }
+}
+
 function setupEventListeners() {
   if (els.sort) els.sort.addEventListener('change', () => {
     state.sort = els.sort.value;
@@ -262,15 +484,17 @@ function setupEventListeners() {
     renderBookshelf();
   });
 
-  if (els.addBtn) els.addBtn.addEventListener('click', () => els.fileInput?.click());
+  // 点击添加书籍按钮打开弹窗
+  if (els.addBtn) els.addBtn.addEventListener('click', openAddBooksModal);
 
+  // 保留原有的文件输入（用于拖拽上传）
   if (els.fileInput) els.fileInput.addEventListener('change', (e) => uploadBooks(e.target.files));
 
   if (els.themeToggle) els.themeToggle.addEventListener('click', () => {
     applyTheme(state.theme === 'light' ? 'dark' : 'light');
   });
 
-  // Drag and Drop
+  // Drag and Drop（页面级别）
   window.addEventListener('dragenter', (e) => {
     e.preventDefault();
     if (els.dragOverlay) els.dragOverlay.classList.add('active');
@@ -293,6 +517,9 @@ function setupEventListeners() {
       }
     });
   }
+  
+  // 初始化添加书籍弹窗
+  initAddBooksModal();
 }
 
 async function init() {

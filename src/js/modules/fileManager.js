@@ -1,6 +1,7 @@
 // File management and bookshelf operations
 import { state, updateState } from '../core/state.js';
 import { DOM, CONFIG, getFileKey } from '../core/config.js';
+import { formatTimeAgo } from '../core/utils.js';
 
 // Load reading history from localStorage
 export function loadReadingHistory() {
@@ -156,33 +157,6 @@ export function renderBookshelf() {
     el.onclick = () => window.openBookFromServer(book);
     bookshelfList.appendChild(el);
   });
-}
-
-// 格式化时间为相对时间
-function formatTimeAgo(timestamp) {
-  const now = Date.now();
-  const diff = now - timestamp;
-  
-  const minute = 60 * 1000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-  const week = 7 * day;
-  const month = 30 * day;
-  
-  if (diff < minute) {
-    return '刚刚';
-  } else if (diff < hour) {
-    return `${Math.floor(diff / minute)}分钟前`;
-  } else if (diff < day) {
-    return `${Math.floor(diff / hour)}小时前`;
-  } else if (diff < week) {
-    return `${Math.floor(diff / day)}天前`;
-  } else if (diff < month) {
-    return `${Math.floor(diff / week)}周前`;
-  } else {
-    const date = new Date(timestamp);
-    return `${date.getMonth() + 1}/${date.getDate()}`;
-  }
 }
 
 // Load book from server

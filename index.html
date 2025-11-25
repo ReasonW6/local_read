@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>我的书架 - 本地阅读</title>
   <link rel="stylesheet" href="src/css/qidian.css">
+  <link rel="stylesheet" href="src/css/components.css">
 </head>
 
 <body>
@@ -71,6 +72,63 @@
   <input id="bookFileInput" type="file" accept=".epub,.txt,.pdf" multiple hidden />
   <div id="dragOverlay" class="drag-overlay"></div>
   <div id="toast" class="toast"></div>
+
+  <!-- 添加书籍弹窗 -->
+  <div id="addBooksMask" class="add-books-mask">
+    <div class="add-books-modal">
+      <div class="add-books-header">
+        <h3 class="add-books-title">添加书籍</h3>
+        <button id="addBooksClose" class="add-books-close" title="关闭">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="add-books-body">
+        <div id="dropZone" class="drop-zone">
+          <div class="drop-zone-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+          </div>
+          <p class="drop-zone-text">拖拽文件到此处</p>
+          <p class="drop-zone-hint">或点击选择文件</p>
+          <button id="selectFilesBtn" class="select-files-btn">选择文件</button>
+          <p class="drop-zone-formats">支持 EPUB / TXT / PDF 格式</p>
+        </div>
+        
+        <div class="files-section">
+          <div class="files-header">
+            <span class="files-title">待添加文件</span>
+            <button id="clearFilesBtn" class="clear-files-btn">清空列表</button>
+          </div>
+          <div id="filesList" class="files-list">
+            <div class="files-empty">
+              <p>还没有选择任何文件</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="add-books-footer">
+        <button id="cancelAddBtn" class="add-books-btn cancel">取消</button>
+        <button id="confirmAddBtn" class="add-books-btn confirm" disabled>
+          <span class="btn-text">添加书籍</span>
+          <span class="btn-loading" style="display:none;">
+            <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="20"></circle>
+            </svg>
+            上传中...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <input id="fileInputModal" type="file" accept=".epub,.txt,.pdf" multiple hidden />
 
   <template id="bookCardTemplate">
     <article class="qd-book-card">
