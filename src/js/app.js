@@ -6,8 +6,6 @@ import {
   applyProgressBarPreference,
   showSavedIndicator,
   deriveBookNameFromPath,
-  formatFileSize,
-  getFileExtension,
   DEFAULT_READING_PREFS
 } from './core/utils.js';
 import { 
@@ -27,6 +25,7 @@ import {
 } from './modules/bookmarkManager.js';
 import { toggleSidebar, closeSidebarIfBookshelf, closeSidebar, goToNextChapter, goToPreviousChapter } from './modules/uiController.js';
 import { configManager } from './modules/configManager.js';
+import { initAddBooksModal, openAddBooksModal } from './modules/addBooksModal.js';
 
 // 导入新模块
 import { 
@@ -827,221 +826,6 @@ function hideUploadProgress() {
   }
 }
 
-/* ========== 添加书籍弹窗 ========== */
-
-let addBooksModalState = {
-  files: [],
-  isUploading: false
-};
-
-function openAddBooksModal() {
-  const mask = document.getElementById('addBooksMask');
-  if (mask) {
-    addBooksModalState.files = [];
-    addBooksModalState.isUploading = false;
-    updateFilesDisplay();
-    updateConfirmButton();
-    mask.classList.add('show');
-  }
-}
-
-function closeAddBooksModal() {
-  const mask = document.getElementById('addBooksMask');
-  if (mask) {
-    mask.classList.remove('show');
-    addBooksModalState.files = [];
-    addBooksModalState.isUploading = false;
-  }
-}
-
-function initAddBooksModal() {
-  const mask = document.getElementById('addBooksMask');
-  const closeBtn = document.getElementById('addBooksClose');
-  const dropZone = document.getElementById('dropZone');
-  const selectFilesBtn = document.getElementById('selectFilesBtn');
-  const fileInput = document.getElementById('fileInputModal');
-  const clearFilesBtn = document.getElementById('clearFilesBtn');
-  const cancelBtn = document.getElementById('cancelAddBtn');
-  const confirmBtn = document.getElementById('confirmAddBtn');
-
-  if (closeBtn) closeBtn.addEventListener('click', closeAddBooksModal);
-  if (cancelBtn) cancelBtn.addEventListener('click', closeAddBooksModal);
-
-  if (mask) {
-    mask.addEventListener('click', (e) => {
-      if (e.target === mask) closeAddBooksModal();
-    });
-  }
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && mask && mask.classList.contains('show')) {
-      closeAddBooksModal();
-    }
-  });
-
-  if (dropZone) {
-    dropZone.addEventListener('click', () => { if (fileInput) fileInput.click(); });
-    dropZone.addEventListener('dragover', handleModalDragOver);
-    dropZone.addEventListener('dragenter', handleModalDragEnter);
-    dropZone.addEventListener('dragleave', handleModalDragLeave);
-    dropZone.addEventListener('drop', handleModalDrop);
-  }
-
-  if (selectFilesBtn) {
-    selectFilesBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (fileInput) fileInput.click();
-    });
-  }
-
-  if (fileInput) fileInput.addEventListener('change', handleModalFileSelect);
-  if (clearFilesBtn) {
-    clearFilesBtn.addEventListener('click', () => {
-      addBooksModalState.files = [];
-      updateFilesDisplay();
-      updateConfirmButton();
-    });
-  }
-  if (confirmBtn) confirmBtn.addEventListener('click', handleConfirmAdd);
-}
-
-function handleModalDragOver(event) {
-  event.preventDefault();
-  event.dataTransfer.dropEffect = 'copy';
-}
-
-function handleModalDragEnter(event) {
-  event.preventDefault();
-  event.currentTarget.classList.add('drag-over');
-}
-
-function handleModalDragLeave(event) {
-  event.preventDefault();
-  if (!event.currentTarget.contains(event.relatedTarget)) {
-    event.currentTarget.classList.remove('drag-over');
-  }
-}
-
-function handleModalDrop(event) {
-  event.preventDefault();
-  event.currentTarget.classList.remove('drag-over');
-  const files = Array.from(event.dataTransfer.files);
-  addFilesToModal(files);
-}
-
-function handleModalFileSelect(event) {
-  const files = Array.from(event.target.files);
-  addFilesToModal(files);
-  event.target.value = '';
-}
-
-function addFilesToModal(files) {
-  const supportedFiles = files.filter(file => {
-    const ext = file.name.toLowerCase();
-    return ext.endsWith('.epub') || ext.endsWith('.txt') || ext.endsWith('.pdf');
-  });
-
-  if (supportedFiles.length === 0) {
-    alert('请选择 .epub、.txt 或 .pdf 格式的文件');
-    return;
-  }
-
-  if (supportedFiles.length !== files.length) {
-    const skipped = files.length - supportedFiles.length;
-    alert(`已忽略 ${skipped} 个不支持的文件，只添加 .epub、.txt、.pdf 格式`);
-  }
-
-  supportedFiles.forEach(file => {
-    const exists = addBooksModalState.files.some(f => 
-      f.name === file.name && f.size === file.size
-    );
-    if (!exists) {
-      addBooksModalState.files.push(file);
-    }
-  });
-
-  updateFilesDisplay();
-  updateConfirmButton();
-}
-
-function updateFilesDisplay() {
-  const filesList = document.getElementById('filesList');
-  if (!filesList) return;
-
-  if (addBooksModalState.files.length === 0) {
-    filesList.innerHTML = `<div class="files-empty"><p>还没有选择任何文件</p></div>`;
-    return;
-  }
-
-  filesList.innerHTML = addBooksModalState.files.map((file, index) => {
-    const ext = getFileExtension(file.name);
-    const size = formatFileSize(file.size);
-    
-    return `
-      <div class="file-item">
-        <div class="file-icon ${ext}">${ext}</div>
-        <div class="file-info">
-          <p class="file-name" title="${file.name}">${file.name}</p>
-          <p class="file-size">${size}</p>
-        </div>
-        <button class="file-remove" onclick="removeFileFromModal(${index})" title="移除">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-    `;
-  }).join('');
-}
-
-function removeFileFromModal(index) {
-  addBooksModalState.files.splice(index, 1);
-  updateFilesDisplay();
-  updateConfirmButton();
-}
-
-function updateConfirmButton() {
-  const confirmBtn = document.getElementById('confirmAddBtn');
-  if (!confirmBtn) return;
-
-  const hasFiles = addBooksModalState.files.length > 0;
-  const isUploading = addBooksModalState.isUploading;
-  
-  confirmBtn.disabled = !hasFiles || isUploading;
-  
-  const btnText = confirmBtn.querySelector('.btn-text');
-  const btnLoading = confirmBtn.querySelector('.btn-loading');
-  
-  if (btnText && btnLoading) {
-    if (isUploading) {
-      btnText.style.display = 'none';
-      btnLoading.style.display = 'flex';
-    } else {
-      btnText.style.display = 'block';
-      btnLoading.style.display = 'none';
-      btnText.textContent = hasFiles ? `添加 ${addBooksModalState.files.length} 个书籍` : '添加书籍';
-    }
-  }
-}
-
-async function handleConfirmAdd() {
-  if (addBooksModalState.files.length === 0 || addBooksModalState.isUploading) return;
-
-  addBooksModalState.isUploading = true;
-  updateConfirmButton();
-
-  try {
-    await uploadFiles(addBooksModalState.files);
-    setTimeout(() => closeAddBooksModal(), 1500);
-  } catch (error) {
-    addBooksModalState.isUploading = false;
-    updateConfirmButton();
-  }
-}
-
-window.removeFileFromModal = removeFileFromModal;
-
 /* ========== 事件监听器设置 ========== */
 
 function setupEventListeners() {
@@ -1093,7 +877,8 @@ function setupEventListeners() {
     addBooksBtn.addEventListener('click', openAddBooksModal);
   }
   
-  initAddBooksModal();
+  // 初始化添加书籍弹窗（传入上传处理函数）
+  initAddBooksModal(uploadFiles);
   
   const themeToggle = DOM.themeToggle();
   const fontIncreaseBtn = DOM.fontIncreaseBtn();
