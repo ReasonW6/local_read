@@ -26,6 +26,13 @@ import {
 import { toggleSidebar, closeSidebarIfBookshelf, closeSidebar, goToNextChapter, goToPreviousChapter } from './modules/uiController.js';
 import { configManager } from './modules/configManager.js';
 import { initAddBooksModal, openAddBooksModal } from './modules/addBooksModal.js';
+import { 
+  initFontManager, 
+  applyFont, 
+  getCurrentFont,
+  renderFontSelector,
+  initFontUpload
+} from './modules/fontManager.js';
 
 // 导入新模块
 import { 
@@ -838,6 +845,11 @@ function setupEventListeners() {
     initSettingsPanel();
     initSidebarAutoClose();
     applyTypography(getReadingPrefs(), updateReadingProgress);
+    
+    // 初始化字体管理器
+    await initFontManager();
+    renderFontSelector();
+    initFontUpload();
 
     let booksFromLoad;
     try {

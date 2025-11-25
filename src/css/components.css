@@ -711,6 +711,61 @@
   border-color: var(--accent);
 }
 
+/* Font selector dropdown styles */
+.settings-select {
+  padding: 6px 28px 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-color);
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 140px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: all 0.2s;
+}
+.settings-select:hover {
+  border-color: var(--accent);
+}
+.settings-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.2);
+}
+.settings-select option {
+  padding: 8px;
+  background: var(--bg);
+  color: var(--text-color);
+}
+.settings-select optgroup {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.font-upload-row {
+  margin-top: 8px;
+}
+.upload-font-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.font-upload-status {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.font-upload-status.success {
+  color: #22c55e;
+}
+.font-upload-status.error {
+  color: #ef4444;
+}
+
 .settings-actions {
   margin-top: 20px;
   padding-top: 16px;

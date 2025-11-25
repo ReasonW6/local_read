@@ -11,11 +11,23 @@ const PORT = 3000;
 // 目录配置
 const DIRS = {
   books: path.join(__dirname, 'books'),
-  config: path.join(__dirname, 'user-data')
+  config: path.join(__dirname, 'user-data'),
+  fonts: path.join(__dirname, 'user-data', 'fonts')
 };
 
 // 支持的文件扩展名
 const ALLOWED_EXTENSIONS = ['.epub', '.txt', '.pdf'];
+
+// 支持的字体扩展名
+const ALLOWED_FONT_EXTENSIONS = ['.ttf', '.otf', '.woff', '.woff2'];
+
+// 字体MIME类型映射
+const FONT_MIME_TYPES = {
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2'
+};
 
 // 图片MIME类型映射
 const IMAGE_MIME_TYPES = {
@@ -393,6 +405,160 @@ app.delete('/api/book', (req, res) => {
   } catch (error) {
     console.error('Error deleting book:', error);
     res.status(500).json({ error: '删除书籍失败: ' + error.message });
+  }
+});
+
+// ==================== 字体管理 API ====================
+
+// 字体上传配置
+const fontStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    if (!fs.existsSync(DIRS.fonts)) {
+      fs.mkdirSync(DIRS.fonts, { recursive: true });
+    }
+    cb(null, DIRS.fonts);
+  },
+  filename: (req, file, cb) => {
+    const originalName = utils.decodeFilename(file.originalname);
+    let finalName = originalName;
+    let counter = 1;
+    
+    while (fs.existsSync(path.join(DIRS.fonts, finalName))) {
+      const ext = path.extname(originalName);
+      const nameWithoutExt = path.basename(originalName, ext);
+      finalName = `${nameWithoutExt}(${counter})${ext}`;
+      counter++;
+    }
+    cb(null, finalName);
+  }
+});
+
+const fontUpload = multer({
+  storage: fontStorage,
+  fileFilter: (req, file, cb) => {
+    const originalName = utils.decodeFilename(file.originalname);
+    const ext = path.extname(originalName).toLowerCase();
+    if (ALLOWED_FONT_EXTENSIONS.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('只支持 .ttf, .otf, .woff, .woff2 字体格式'));
+    }
+  },
+  limits: {
+    fileSize: 20 * 1024 * 1024 // 20MB 限制
+  }
+});
+
+// 获取字体列表
+app.get('/api/fonts', (req, res) => {
+  try {
+    if (!fs.existsSync(DIRS.fonts)) {
+      return res.json([]);
+    }
+    
+    const files = fs.readdirSync(DIRS.fonts);
+    const fonts = files
+      .filter(file => ALLOWED_FONT_EXTENSIONS.includes(path.extname(file).toLowerCase()))
+      .map(file => {
+        const ext = path.extname(file);
+        const nameWithoutExt = path.basename(file, ext);
+        const stats = fs.statSync(path.join(DIRS.fonts, file));
+        
+        return {
+          id: file,
+          name: nameWithoutExt,
+          fontFamily: `CustomFont_${nameWithoutExt.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          filename: file,
+          size: stats.size,
+          addedAt: stats.birthtimeMs || stats.ctimeMs
+        };
+      });
+    
+    res.json(fonts);
+  } catch (error) {
+    console.error('Error getting fonts:', error);
+    res.status(500).json({ error: '获取字体列表失败' });
+  }
+});
+
+// 上传字体
+app.post('/api/fonts/upload', fontUpload.single('font'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: '没有上传文件' });
+    }
+    
+    const ext = path.extname(req.file.filename);
+    const nameWithoutExt = path.basename(req.file.filename, ext);
+    
+    res.json({
+      success: true,
+      font: {
+        id: req.file.filename,
+        name: nameWithoutExt,
+        fontFamily: `CustomFont_${nameWithoutExt.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        filename: req.file.filename,
+        size: req.file.size
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading font:', error);
+    res.status(500).json({ error: '上传字体失败: ' + error.message });
+  }
+});
+
+// 获取字体文件
+app.get('/api/fonts/file/:fontId', (req, res) => {
+  try {
+    const fontId = req.params.fontId;
+    const fontPath = path.join(DIRS.fonts, fontId);
+    
+    // 安全检查
+    const resolved = path.resolve(fontPath);
+    if (!resolved.startsWith(path.resolve(DIRS.fonts))) {
+      return res.status(403).json({ error: '无效的字体路径' });
+    }
+    
+    if (!fs.existsSync(fontPath)) {
+      return res.status(404).json({ error: '字体不存在' });
+    }
+    
+    const ext = path.extname(fontId).toLowerCase();
+    const mimeType = FONT_MIME_TYPES[ext] || 'application/octet-stream';
+    
+    res.set({
+      'Content-Type': mimeType,
+      'Cache-Control': 'public, max-age=31536000'
+    });
+    
+    res.sendFile(fontPath);
+  } catch (error) {
+    console.error('Error serving font:', error);
+    res.status(500).json({ error: '获取字体失败' });
+  }
+});
+
+// 删除字体
+app.delete('/api/fonts/:fontId', (req, res) => {
+  try {
+    const fontId = req.params.fontId;
+    const fontPath = path.join(DIRS.fonts, fontId);
+    
+    // 安全检查
+    const resolved = path.resolve(fontPath);
+    if (!resolved.startsWith(path.resolve(DIRS.fonts))) {
+      return res.status(403).json({ error: '无效的字体路径' });
+    }
+    
+    if (!fs.existsSync(fontPath)) {
+      return res.status(404).json({ error: '字体不存在' });
+    }
+    
+    fs.unlinkSync(fontPath);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting font:', error);
+    res.status(500).json({ error: '删除字体失败: ' + error.message });
   }
 });
 
