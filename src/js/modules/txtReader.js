@@ -7,23 +7,52 @@ import { clearReader, renderTOC, updateActiveTOC, renderChapterNav } from './uiC
 // Open TXT file
 export async function openTxt(text, fileName) {
   clearReader();
-  const chapterRegex = /(^\s*第[零一二三四五六七八九十百千万\d\s]+章.*$)/m;
-  const parts = text.split(chapterRegex);
+  // 多规则章节检测（按行扫描更可靠）
+  const CHAPTER_RULES = [
+    /^\s*第[零一二三四五六七八九十百千万\d\s]+章.*$/u,
+    /^[ 　\t]{0,4}(?:序章|楔子|正文(?!完|结)|终章|后记|尾声|番外|第\s{0,4}[\d〇零一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+?\s{0,4}(?:章|节(?!课)|卷|集(?![合和])|部(?![分赛游])|篇(?!张))).{0,30}$/u
+  ];
+
+  const isTitleLine = (line) => {
+    if (!line) return false;
+    return CHAPTER_RULES.some((r) => {
+      try { return r.test(line); } catch (e) { return false; }
+    });
+  };
+
+  const lines = text.replace(/\r/g, '').split('\n');
   const chapters = [];
   const txtPages = [];
-  
+
   updateState({ type: 'txt' });
-  
-  let intro = parts.shift()?.trim();
-  if (intro) {
-    chapters.push({ label: '前言', href: '#txt-0' });
-    txtPages.push(intro);
+
+  // 扫描每一行，收集章节索引
+  const chapterIndices = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (isTitleLine(lines[i])) {
+      chapterIndices.push(i);
+    }
   }
-  
-  for (let i = 0; i < parts.length; i += 2) {
-    const title = parts[i]?.trim();
-    const content = parts[i + 1];
-    if (title) {
+
+  if (chapterIndices.length === 0) {
+    // 回退：全文视为单章
+    chapters.push({ label: fileName, href: '#txt-0' });
+    txtPages.push(text);
+  } else {
+    // 如果文件开头有导语（章节前内容），处理为前言
+    if (chapterIndices[0] > 0) {
+      const intro = lines.slice(0, chapterIndices[0]).join('\n').trim();
+      if (intro) {
+        chapters.push({ label: '前言', href: '#txt-0' });
+        txtPages.push(intro);
+      }
+    }
+
+    for (let ci = 0; ci < chapterIndices.length; ci++) {
+      const startLine = chapterIndices[ci];
+      const endLine = (ci + 1 < chapterIndices.length) ? chapterIndices[ci + 1] : lines.length;
+      const title = lines[startLine].trim();
+      const content = lines.slice(startLine + 1, endLine).join('\n');
       chapters.push({ label: title, href: '#txt-' + chapters.length });
       txtPages.push((title + '\n\n' + (content || '')).trim());
     }
