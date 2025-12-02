@@ -1,14 +1,27 @@
 {
-  "name": "local_read",
+  "name": "local-read",
   "version": "1.0.0",
-  "description": "一个运行在本地的电子书阅读网页，通过 Node.js 服务器，它可以稳定地访问你本地的书库，需要手动记录你的阅读进度。",
-  "main": "server.js",
+  "description": "一个本地电子书阅读器，支持 EPUB、TXT、PDF 格式",
+  "main": "electron-main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "electron": "electron .",
+    "electron:dev": "electron . --dev",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "electron",
+    "ebook",
+    "reader",
+    "epub",
+    "pdf"
+  ],
+  "author": "ReasonW6",
   "license": "ISC",
   "dependencies": {
     "adm-zip": "^0.5.12",
@@ -16,5 +29,79 @@
     "express": "^5.1.0",
     "multer": "^2.0.2",
     "pdf-poppler": "^0.2.3"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.localread.app",
+    "productName": "本地阅读器",
+    "copyright": "Copyright © 2024 ReasonW6",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!node_modules/.cache/**"
+    ],
+    "extraResources": [
+      {
+        "from": "books",
+        "to": "books",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "user-data",
+        "to": "user-data",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "本地阅读器"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.books"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Office"
+    }
   }
 }
