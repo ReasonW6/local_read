@@ -2,6 +2,16 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 
+// ==================== 性能优化：启动加速 ====================
+// 禁用不必要的 Chromium 特性以加快启动速度
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+// 启用 V8 代码缓存
+app.commandLine.appendSwitch('js-flags', '--optimize_for_size');
+
 // 导入服务器模块
 let server = null;
 const PORT = 31337; // 使用非常见端口避免冲突
@@ -20,7 +30,11 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      // 性能优化选项
+      backgroundThrottling: false,
+      spellcheck: false,
+      enableWebSQL: false
     },
     show: false,
     backgroundColor: '#1a1a2e',
@@ -57,6 +71,7 @@ function createWindow() {
 function startServer() {
   return new Promise((resolve, reject) => {
     try {
+      // 延迟加载模块以加速启动
       const express = require('express');
       const multer = require('multer');
       const fs = require('fs');
@@ -64,11 +79,14 @@ function startServer() {
 
       const expressApp = express();
 
-      // 目录配置
+      // 目录配置 - 支持打包后的路径
+      const isPackaged = app.isPackaged;
+      const basePath = isPackaged ? process.resourcesPath : __dirname;
+      
       const DIRS = {
-        books: path.join(__dirname, 'books'),
-        config: path.join(__dirname, 'user-data'),
-        fonts: path.join(__dirname, 'user-data', 'fonts')
+        books: isPackaged ? path.join(basePath, 'books') : path.join(__dirname, 'books'),
+        config: isPackaged ? path.join(basePath, 'user-data') : path.join(__dirname, 'user-data'),
+        fonts: isPackaged ? path.join(basePath, 'user-data', 'fonts') : path.join(__dirname, 'user-data', 'fonts')
       };
 
       // 支持的文件扩展名
@@ -103,7 +121,12 @@ function startServer() {
 
       // 中间件配置
       expressApp.use(express.json({ limit: '10mb' }));
+      // 静态文件服务 - 支持打包后的路径
       expressApp.use(express.static(__dirname));
+      if (isPackaged) {
+        expressApp.use('/books', express.static(DIRS.books));
+        expressApp.use('/user-data', express.static(DIRS.config));
+      }
 
       // 工具函数
       const utils = {
@@ -628,7 +651,18 @@ app.on('window-all-closed', () => {
 // 应用退出前关闭服务器
 app.on('before-quit', () => {
   if (server) {
+    server.close(() => {
+      console.log('Server closed');
+    });
+    server = null;
+  }
+});
+
+// 应用退出时确保清理
+app.on('quit', () => {
+  if (server) {
     server.close();
+    server = null;
   }
 });
 
@@ -638,7 +672,11 @@ ipcMain.handle('get-app-version', () => {
 });
 
 ipcMain.handle('open-books-folder', () => {
-  const booksPath = path.join(__dirname, 'books');
+  // 支持打包后的路径
+  const isPackaged = app.isPackaged;
+  const booksPath = isPackaged 
+    ? path.join(process.resourcesPath, 'books') 
+    : path.join(__dirname, 'books');
   shell.openPath(booksPath);
 });
 

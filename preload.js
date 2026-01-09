@@ -15,9 +15,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 检测是否在 Electron 环境中
   isElectron: true
 });
-
-// 在 DOM 准备好后执行
-window.addEventListener('DOMContentLoaded', () => {
-  // 可以在这里添加一些 DOM 操作
-  console.log('Electron preload script loaded');
-});

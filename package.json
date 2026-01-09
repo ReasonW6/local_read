@@ -25,10 +25,8 @@
   "license": "ISC",
   "dependencies": {
     "adm-zip": "^0.5.12",
-    "canvas": "^3.2.0",
     "express": "^5.1.0",
-    "multer": "^2.0.2",
-    "pdf-poppler": "^0.2.3"
+    "multer": "^2.0.2"
   },
   "devDependencies": {
     "electron": "^33.4.11",
@@ -38,6 +36,8 @@
     "appId": "com.localread.app",
     "productName": "本地阅读器",
     "copyright": "Copyright © 2024 ReasonW6",
+    "asar": true,
+    "compression": "maximum",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -45,7 +45,15 @@
     "files": [
       "**/*",
       "!dist/**",
-      "!node_modules/.cache/**"
+      "!node_modules/.cache/**",
+      "!.git/**",
+      "!.gitignore",
+      "!README.md",
+      "!更新日志.txt",
+      "!server.js",
+      "!start.bat",
+      "!**/*.map",
+      "!**/*.md"
     ],
     "extraResources": [
       {
