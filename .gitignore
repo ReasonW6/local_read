@@ -8,4 +8,5 @@ user-data/*
 !user-data/.gitkeep
 .cache/
 .codebuddy/
+dist/
 更新日志.txt
