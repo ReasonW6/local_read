@@ -122,26 +122,34 @@ async function loadCover(book, card) {
   }
 
   try {
-    const response = await fetch(`${CONFIG.SERVER_API.BOOK_COVER}?path=${encodeURIComponent(book.path)}`);
-    if (response.ok) {
-      const result = await response.json();
-      if (result.cover) {
-        state.covers.set(book.path, result.cover);
-        img.src = result.cover;
-        img.hidden = false;
-        if (placeholder) placeholder.hidden = true;
-        return;
+    // 直接使用图片 URL，不需要 JSON 解析
+    const coverUrl = `${CONFIG.SERVER_API.BOOK_COVER}?path=${encodeURIComponent(book.path)}`;
+    
+    // 使用 Image 对象预加载验证图片
+    const testImg = new Image();
+    testImg.onload = () => {
+      state.covers.set(book.path, coverUrl);
+      img.src = coverUrl;
+      img.hidden = false;
+      if (placeholder) placeholder.hidden = true;
+    };
+    testImg.onerror = () => {
+      // 加载失败，显示占位符
+      if (placeholder) {
+        placeholder.textContent = book.name[0];
+        placeholder.hidden = false;
       }
-    }
+      if (img) img.hidden = true;
+    };
+    testImg.src = coverUrl;
   } catch (e) {
     console.warn('Cover load failed', e);
+    if (placeholder) {
+      placeholder.textContent = book.name[0];
+      placeholder.hidden = false;
+    }
+    if (img) img.hidden = true;
   }
-
-  if (placeholder) {
-    placeholder.textContent = book.name[0];
-    placeholder.hidden = false;
-  }
-  if (img) img.hidden = true;
 }
 
 function createBookCard(book) {

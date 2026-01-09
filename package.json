@@ -53,23 +53,9 @@
       "!server.js",
       "!start.bat",
       "!**/*.map",
-      "!**/*.md"
-    ],
-    "extraResources": [
-      {
-        "from": "books",
-        "to": "books",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "user-data",
-        "to": "user-data",
-        "filter": [
-          "**/*"
-        ]
-      }
+      "!**/*.md",
+      "!books/**",
+      "!user-data/**"
     ],
     "win": {
       "target": [

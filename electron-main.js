@@ -9,8 +9,9 @@ app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
-// 启用 V8 代码缓存
-app.commandLine.appendSwitch('js-flags', '--optimize_for_size');
+// 高 DPI 支持
+app.commandLine.appendSwitch('high-dpi-support', '1');
+app.commandLine.appendSwitch('force-color-profile', 'srgb');
 
 // 导入服务器模块
 let server = null;
@@ -79,14 +80,14 @@ function startServer() {
 
       const expressApp = express();
 
-      // 目录配置 - 支持打包后的路径
+      // 目录配置 - 开发环境用项目目录，生产环境用用户目录
       const isPackaged = app.isPackaged;
-      const basePath = isPackaged ? process.resourcesPath : __dirname;
+      const dataPath = isPackaged ? app.getPath('userData') : __dirname;
       
       const DIRS = {
-        books: isPackaged ? path.join(basePath, 'books') : path.join(__dirname, 'books'),
-        config: isPackaged ? path.join(basePath, 'user-data') : path.join(__dirname, 'user-data'),
-        fonts: isPackaged ? path.join(basePath, 'user-data', 'fonts') : path.join(__dirname, 'user-data', 'fonts')
+        books: path.join(dataPath, 'books'),
+        config: path.join(dataPath, isPackaged ? 'config' : 'user-data'),
+        fonts: path.join(dataPath, isPackaged ? 'config/fonts' : 'user-data/fonts')
       };
 
       // 支持的文件扩展名
@@ -672,11 +673,9 @@ ipcMain.handle('get-app-version', () => {
 });
 
 ipcMain.handle('open-books-folder', () => {
-  // 支持打包后的路径
   const isPackaged = app.isPackaged;
-  const booksPath = isPackaged 
-    ? path.join(process.resourcesPath, 'books') 
-    : path.join(__dirname, 'books');
+  const dataPath = isPackaged ? app.getPath('userData') : __dirname;
+  const booksPath = path.join(dataPath, 'books');
   shell.openPath(booksPath);
 });
 
