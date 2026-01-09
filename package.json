@@ -11,6 +11,7 @@
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
+    "dist:win:zip": "electron-builder --win zip",
     "dist:mac": "electron-builder --mac",
     "dist:linux": "electron-builder --linux"
   },
@@ -67,6 +68,12 @@
         },
         {
           "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "x64"
           ]
