@@ -80,14 +80,15 @@ function startServer() {
 
       const expressApp = express();
 
-      // 目录配置 - 开发环境用项目目录，生产环境用用户目录
+      // 目录配置 - 绿色版：始终使用程序所在目录
       const isPackaged = app.isPackaged;
-      const dataPath = isPackaged ? app.getPath('userData') : __dirname;
+      // 获取程序所在目录（打包后是exe所在目录）
+      const appDir = isPackaged ? path.dirname(process.execPath) : __dirname;
       
       const DIRS = {
-        books: path.join(dataPath, 'books'),
-        config: path.join(dataPath, isPackaged ? 'config' : 'user-data'),
-        fonts: path.join(dataPath, isPackaged ? 'config/fonts' : 'user-data/fonts')
+        books: path.join(appDir, 'books'),
+        config: path.join(appDir, 'user-data'),
+        fonts: path.join(appDir, 'user-data', 'fonts')
       };
 
       // 支持的文件扩展名
@@ -674,8 +675,8 @@ ipcMain.handle('get-app-version', () => {
 
 ipcMain.handle('open-books-folder', () => {
   const isPackaged = app.isPackaged;
-  const dataPath = isPackaged ? app.getPath('userData') : __dirname;
-  const booksPath = path.join(dataPath, 'books');
+  const appDir = isPackaged ? path.dirname(process.execPath) : __dirname;
+  const booksPath = path.join(appDir, 'books');
   shell.openPath(booksPath);
 });
 
