@@ -2,6 +2,27 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 
+// 数据目录支持：可通过环境变量覆盖（适合便携版/自定义路径）
+const DATA_DIR_ENV = 'LOCAL_READ_DATA_DIR';
+const PORTABLE_DIR_ENV = 'PORTABLE_EXECUTABLE_DIR';
+
+const getDataRoot = () => {
+  if (!app.isPackaged) {
+    return __dirname;
+  }
+  return process.env[DATA_DIR_ENV] || process.env[PORTABLE_DIR_ENV] || app.getPath('userData');
+};
+
+const getRuntimeDirs = () => {
+  const dataRoot = getDataRoot();
+  return {
+    dataRoot,
+    books: path.join(dataRoot, 'books'),
+    config: path.join(dataRoot, 'user-data'),
+    fonts: path.join(dataRoot, 'user-data', 'fonts')
+  };
+};
+
 // ==================== 性能优化：启动加速 ====================
 // 禁用不必要的 Chromium 特性以加快启动速度
 app.commandLine.appendSwitch('disable-gpu-sandbox');
@@ -81,15 +102,7 @@ function startServer() {
       const expressApp = express();
 
       // 目录配置 - 绿色版：始终使用程序所在目录
-      const isPackaged = app.isPackaged;
-      // 获取程序所在目录（打包后是exe所在目录）
-      const appDir = isPackaged ? path.dirname(process.execPath) : __dirname;
-      
-      const DIRS = {
-        books: path.join(appDir, 'books'),
-        config: path.join(appDir, 'user-data'),
-        fonts: path.join(appDir, 'user-data', 'fonts')
-      };
+      const DIRS = getRuntimeDirs();
 
       // 支持的文件扩展名
       const ALLOWED_EXTENSIONS = ['.epub', '.txt', '.pdf'];
@@ -111,8 +124,17 @@ function startServer() {
         '.webp': 'image/webp'
       };
 
-      // 封面缓存
+      // 封面缓存（限制大小，避免大书库占用过多内存）
       const coverCache = new Map();
+      const COVER_CACHE_LIMIT = 200;
+
+      const setCoverCache = (key, mtime, data) => {
+        coverCache.set(key, { mtime, data });
+        if (coverCache.size > COVER_CACHE_LIMIT) {
+          const oldestKey = coverCache.keys().next().value;
+          if (oldestKey) coverCache.delete(oldestKey);
+        }
+      };
 
       // 确保目录存在
       Object.values(DIRS).forEach(dir => {
@@ -125,10 +147,9 @@ function startServer() {
       expressApp.use(express.json({ limit: '10mb' }));
       // 静态文件服务 - 支持打包后的路径
       expressApp.use(express.static(__dirname));
-      if (isPackaged) {
-        expressApp.use('/books', express.static(DIRS.books));
-        expressApp.use('/user-data', express.static(DIRS.config));
-      }
+      // 书籍/配置目录可能在可执行文件目录之外，统一显式挂载
+      expressApp.use('/books', express.static(DIRS.books));
+      expressApp.use('/user-data', express.static(DIRS.config));
 
       // 工具函数
       const utils = {
@@ -139,6 +160,18 @@ function startServer() {
           const booksRoot = path.resolve(DIRS.books);
           if (!resolved.toLowerCase().startsWith(booksRoot.toLowerCase())) {
             throw new Error('Invalid book path');
+          }
+          return resolved;
+        },
+        resolveConfigPath: (filename = '') => {
+          const normalized = path.normalize(filename).replace(/^([\.\\/])+/, '');
+          const resolved = path.resolve(DIRS.config, normalized);
+          const configRoot = path.resolve(DIRS.config);
+          if (!resolved.toLowerCase().startsWith(configRoot.toLowerCase())) {
+            throw new Error('Invalid config path');
+          }
+          if (path.extname(resolved).toLowerCase() !== '.json') {
+            throw new Error('Invalid config file type');
           }
           return resolved;
         },
@@ -255,21 +288,30 @@ function startServer() {
             return Object.prototype.hasOwnProperty.call(IMAGE_MIME_TYPES, ext);
           });
 
-          if (imageEntries.length === 0) return null;
+          if (imageEntries.length === 0) {
+            setCoverCache(cacheKey, stats.mtimeMs, null);
+            return null;
+          }
 
           let coverEntry = imageEntries.find(entry => /cover/i.test(path.basename(entry.entryName)));
           if (!coverEntry) coverEntry = imageEntries[0];
-          if (!coverEntry) return null;
+          if (!coverEntry) {
+            setCoverCache(cacheKey, stats.mtimeMs, null);
+            return null;
+          }
 
           const data = coverEntry.getData();
-          if (!data) return null;
+          if (!data) {
+            setCoverCache(cacheKey, stats.mtimeMs, null);
+            return null;
+          }
 
           const ext = path.extname(coverEntry.entryName).toLowerCase();
           const mime = IMAGE_MIME_TYPES[ext] || 'image/jpeg';
           const base64 = data.toString('base64');
           const dataUrl = `data:${mime};base64,${base64}`;
 
-          coverCache.set(cacheKey, { mtime: stats.mtimeMs, data: dataUrl });
+          setCoverCache(cacheKey, stats.mtimeMs, dataUrl);
           return dataUrl;
         } catch (error) {
           console.warn('Failed to extract EPUB cover:', error.message);
@@ -350,7 +392,12 @@ function startServer() {
             return res.status(400).json({ error: '配置数据不能为空' });
           }
           const configFilename = filename || `reader-config-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-          const configPath = path.join(DIRS.config, configFilename);
+          let configPath;
+          try {
+            configPath = utils.resolveConfigPath(configFilename);
+          } catch {
+            return res.status(400).json({ error: '无效的配置文件名' });
+          }
           const configWithMeta = {
             ...config,
             metadata: {
@@ -360,6 +407,9 @@ function startServer() {
               appName: 'Local E-Book Reader'
             }
           };
+          if (!fs.existsSync(DIRS.config)) {
+            fs.mkdirSync(DIRS.config, { recursive: true });
+          }
           fs.writeFileSync(configPath, JSON.stringify(configWithMeta, null, 2));
           res.json({ success: true, message: '配置保存成功', filename: configFilename, path: configPath });
         } catch (error) {
@@ -371,7 +421,12 @@ function startServer() {
       // 加载用户配置
       expressApp.get('/api/load-config/:filename', (req, res) => {
         try {
-          const configPath = path.join(DIRS.config, req.params.filename);
+          let configPath;
+          try {
+            configPath = utils.resolveConfigPath(req.params.filename);
+          } catch {
+            return res.status(400).json({ error: '无效的配置文件' });
+          }
           if (!fs.existsSync(configPath)) {
             return res.status(404).json({ error: '配置文件不存在' });
           }
@@ -386,6 +441,9 @@ function startServer() {
       // 获取配置文件列表
       expressApp.get('/api/config-list', (req, res) => {
         try {
+          if (!fs.existsSync(DIRS.config)) {
+            return res.json({ success: true, configs: [] });
+          }
           const files = fs.readdirSync(DIRS.config)
             .filter(file => file.endsWith('.json'))
             .map(file => {
@@ -414,7 +472,12 @@ function startServer() {
       // 删除配置文件
       expressApp.delete('/api/config/:filename', (req, res) => {
         try {
-          const configPath = path.join(DIRS.config, req.params.filename);
+          let configPath;
+          try {
+            configPath = utils.resolveConfigPath(req.params.filename);
+          } catch {
+            return res.status(400).json({ error: '无效的配置文件' });
+          }
           if (!fs.existsSync(configPath)) {
             return res.status(404).json({ error: '配置文件不存在' });
           }
@@ -429,7 +492,12 @@ function startServer() {
       // 下载配置文件
       expressApp.get('/api/download-config/:filename', (req, res) => {
         try {
-          const configPath = path.join(DIRS.config, req.params.filename);
+          let configPath;
+          try {
+            configPath = utils.resolveConfigPath(req.params.filename);
+          } catch {
+            return res.status(400).json({ error: '无效的配置文件' });
+          }
           if (!fs.existsSync(configPath)) {
             return res.status(404).json({ error: '配置文件不存在' });
           }
@@ -674,10 +742,12 @@ ipcMain.handle('get-app-version', () => {
 });
 
 ipcMain.handle('open-books-folder', () => {
-  const isPackaged = app.isPackaged;
-  const appDir = isPackaged ? path.dirname(process.execPath) : __dirname;
-  const booksPath = path.join(appDir, 'books');
-  shell.openPath(booksPath);
+  const fs = require('fs');
+  const { books } = getRuntimeDirs();
+  if (!fs.existsSync(books)) {
+    fs.mkdirSync(books, { recursive: true });
+  }
+  shell.openPath(books);
 });
 
 ipcMain.handle('open-external-link', (event, url) => {

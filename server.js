@@ -38,8 +38,17 @@ const IMAGE_MIME_TYPES = {
   '.webp': 'image/webp'
 };
 
-// 封面缓存
+// 封面缓存（限制大小，避免大书库占用过多内存）
 const coverCache = new Map();
+const COVER_CACHE_LIMIT = 200;
+
+function setCoverCache(key, mtime, data) {
+  coverCache.set(key, { mtime, data });
+  if (coverCache.size > COVER_CACHE_LIMIT) {
+    const oldestKey = coverCache.keys().next().value;
+    if (oldestKey) coverCache.delete(oldestKey);
+  }
+}
 
 // 确保目录存在
 Object.values(DIRS).forEach(dir => {
@@ -64,6 +73,20 @@ const utils = {
     const booksRoot = path.resolve(DIRS.books);
     if (!resolved.toLowerCase().startsWith(booksRoot.toLowerCase())) {
       throw new Error('Invalid book path');
+    }
+    return resolved;
+  },
+
+  // 解析配置路径（带安全检查）
+  resolveConfigPath: (filename = '') => {
+    const normalized = path.normalize(filename).replace(/^([\.\\/])+/, '');
+    const resolved = path.resolve(DIRS.config, normalized);
+    const configRoot = path.resolve(DIRS.config);
+    if (!resolved.toLowerCase().startsWith(configRoot.toLowerCase())) {
+      throw new Error('Invalid config path');
+    }
+    if (path.extname(resolved).toLowerCase() !== '.json') {
+      throw new Error('Invalid config file type');
     }
     return resolved;
   },
@@ -151,24 +174,33 @@ const extractEpubCover = (absolutePath) => {
       return Object.prototype.hasOwnProperty.call(IMAGE_MIME_TYPES, ext);
     });
 
-    if (imageEntries.length === 0) return null;
+    if (imageEntries.length === 0) {
+      setCoverCache(cacheKey, stats.mtimeMs, null);
+      return null;
+    }
 
     let coverEntry = imageEntries.find(entry => /cover/i.test(path.basename(entry.entryName)));
     if (!coverEntry) {
       coverEntry = imageEntries[0];
     }
 
-    if (!coverEntry) return null;
+    if (!coverEntry) {
+      setCoverCache(cacheKey, stats.mtimeMs, null);
+      return null;
+    }
 
     const data = coverEntry.getData();
-    if (!data) return null;
+    if (!data) {
+      setCoverCache(cacheKey, stats.mtimeMs, null);
+      return null;
+    }
 
     const ext = path.extname(coverEntry.entryName).toLowerCase();
     const mime = IMAGE_MIME_TYPES[ext] || 'image/jpeg';
     const base64 = data.toString('base64');
     const dataUrl = `data:${mime};base64,${base64}`;
 
-    coverCache.set(cacheKey, { mtime: stats.mtimeMs, data: dataUrl });
+    setCoverCache(cacheKey, stats.mtimeMs, dataUrl);
     return dataUrl;
   } catch (error) {
     console.warn('Failed to extract EPUB cover:', error.message);
@@ -255,7 +287,12 @@ app.post('/api/save-config', (req, res) => {
     }
 
     const configFilename = filename || `reader-config-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-    const configPath = path.join(DIRS.config, configFilename);
+    let configPath;
+    try {
+      configPath = utils.resolveConfigPath(configFilename);
+    } catch {
+      return res.status(400).json({ error: '无效的配置文件名' });
+    }
 
     const configWithMeta = {
       ...config,
@@ -266,7 +303,9 @@ app.post('/api/save-config', (req, res) => {
         appName: 'Local E-Book Reader'
       }
     };
-
+    if (!fs.existsSync(DIRS.config)) {
+      fs.mkdirSync(DIRS.config, { recursive: true });
+    }
     fs.writeFileSync(configPath, JSON.stringify(configWithMeta, null, 2));
     res.json({ success: true, message: '配置保存成功', filename: configFilename, path: configPath });
   } catch (error) {
@@ -278,7 +317,12 @@ app.post('/api/save-config', (req, res) => {
 // 加载用户配置
 app.get('/api/load-config/:filename', (req, res) => {
   try {
-    const configPath = path.join(DIRS.config, req.params.filename);
+    let configPath;
+    try {
+      configPath = utils.resolveConfigPath(req.params.filename);
+    } catch {
+      return res.status(400).json({ error: '无效的配置文件' });
+    }
     if (!fs.existsSync(configPath)) {
       return res.status(404).json({ error: '配置文件不存在' });
     }
@@ -293,6 +337,9 @@ app.get('/api/load-config/:filename', (req, res) => {
 // 获取配置文件列表
 app.get('/api/config-list', (req, res) => {
   try {
+    if (!fs.existsSync(DIRS.config)) {
+      return res.json({ success: true, configs: [] });
+    }
     const files = fs.readdirSync(DIRS.config)
       .filter(file => file.endsWith('.json'))
       .map(file => {
@@ -321,7 +368,12 @@ app.get('/api/config-list', (req, res) => {
 // 删除配置文件
 app.delete('/api/config/:filename', (req, res) => {
   try {
-    const configPath = path.join(DIRS.config, req.params.filename);
+    let configPath;
+    try {
+      configPath = utils.resolveConfigPath(req.params.filename);
+    } catch {
+      return res.status(400).json({ error: '无效的配置文件' });
+    }
     if (!fs.existsSync(configPath)) {
       return res.status(404).json({ error: '配置文件不存在' });
     }
@@ -336,7 +388,12 @@ app.delete('/api/config/:filename', (req, res) => {
 // 下载配置文件
 app.get('/api/download-config/:filename', (req, res) => {
   try {
-    const configPath = path.join(DIRS.config, req.params.filename);
+    let configPath;
+    try {
+      configPath = utils.resolveConfigPath(req.params.filename);
+    } catch {
+      return res.status(400).json({ error: '无效的配置文件' });
+    }
     if (!fs.existsSync(configPath)) {
       return res.status(404).json({ error: '配置文件不存在' });
     }

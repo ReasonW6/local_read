@@ -13,6 +13,16 @@ const state = {
   theme: 'light'
 };
 
+const MAX_COVER_CACHE = 200;
+
+function setCoverCache(key, value) {
+  state.covers.set(key, value);
+  if (state.covers.size > MAX_COVER_CACHE) {
+    const oldestKey = state.covers.keys().next().value;
+    if (oldestKey) state.covers.delete(oldestKey);
+  }
+}
+
 const els = {
   grid: document.getElementById('bookshelfGrid'),
   empty: document.getElementById('bookshelfEmpty'),
@@ -113,35 +123,53 @@ async function loadCover(book, card) {
     return;
   }
 
-  const cached = state.covers.get(book.path);
-  if (cached) {
-    img.src = cached;
-    img.hidden = false;
-    if (placeholder) placeholder.hidden = true;
-    return;
-  }
-
-  try {
-    // 直接使用图片 URL，不需要 JSON 解析
-    const coverUrl = `${CONFIG.SERVER_API.BOOK_COVER}?path=${encodeURIComponent(book.path)}`;
-    
-    // 使用 Image 对象预加载验证图片
-    const testImg = new Image();
-    testImg.onload = () => {
-      state.covers.set(book.path, coverUrl);
-      img.src = coverUrl;
+  if (state.covers.has(book.path)) {
+    const cached = state.covers.get(book.path);
+    if (cached) {
+      img.src = cached;
       img.hidden = false;
       if (placeholder) placeholder.hidden = true;
-    };
-    testImg.onerror = () => {
-      // 加载失败，显示占位符
+    } else {
       if (placeholder) {
         placeholder.textContent = book.name[0];
         placeholder.hidden = false;
       }
       if (img) img.hidden = true;
-    };
-    testImg.src = coverUrl;
+    }
+    return;
+  }
+
+  try {
+    const coverUrl = `${CONFIG.SERVER_API.BOOK_COVER}?path=${encodeURIComponent(book.path)}`;
+    const response = await fetch(coverUrl);
+    if (!response.ok) throw new Error('Cover request failed');
+
+    const contentType = response.headers.get('content-type') || '';
+    let finalSrc = '';
+
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      if (!data || !data.cover) {
+        setCoverCache(book.path, null);
+        if (placeholder) {
+          placeholder.textContent = book.name[0];
+          placeholder.hidden = false;
+        }
+        if (img) img.hidden = true;
+        return;
+      }
+      finalSrc = data.cover;
+    } else if (contentType.startsWith('image/')) {
+      const blob = await response.blob();
+      finalSrc = URL.createObjectURL(blob);
+    } else {
+      throw new Error('Unexpected cover response');
+    }
+
+    setCoverCache(book.path, finalSrc);
+    img.src = finalSrc;
+    img.hidden = false;
+    if (placeholder) placeholder.hidden = true;
   } catch (e) {
     console.warn('Cover load failed', e);
     if (placeholder) {

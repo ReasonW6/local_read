@@ -38,7 +38,8 @@
     "productName": "本地阅读器",
     "copyright": "Copyright © 2024 ReasonW6",
     "asar": true,
-    "compression": "maximum",
+    "compression": "normal",
+    "npmRebuild": false,
     "directories": {
       "output": "dist",
       "buildResources": "build"

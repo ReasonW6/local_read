@@ -1,10 +1,10 @@
 # 🔖 本地电子书阅读器 (Local E-Book Reader)
 
-[![Node.js](https://img.shields.io/badge/Node.js-v14%2B-green.svg)](https://nodejs.org/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-v18%2B-green.svg)](https://nodejs.org/)
+[![License](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ReasonW6/local_read/pulls)
 
-> 一个运行在本地的电子书阅读网页应用，通过 Node.js 服务器稳定访问你的本地书库，支持手动记录阅读进度。支持EPUB、TXT、PDF格式，具备完整的配置管理和数据持久化功能。
+> 一个运行在本地的电子书阅读网页应用，同时提供 Electron 桌面版。通过内置服务器稳定访问你的本地书库，支持手动记录阅读进度。支持 EPUB、TXT、PDF 格式，具备完整的配置管理和数据持久化功能。
 
 [⚡快速开始](#-快速开始) | [📝使用说明](#-使用说明) | [🔧配置管理](#-配置管理)
 
@@ -46,8 +46,9 @@
 
 ### 📋 环境要求
 
-- [Node.js](https://nodejs.org/) v14.0+ (推荐 LTS 版本)
-- 现代浏览器 (Chrome, Firefox, Edge, Safari)
+- [Node.js](https://nodejs.org/) v18.0+ (推荐 LTS 版本)
+- 现代浏览器 (Chrome, Firefox, Edge, Safari，仅 Web 模式需要)
+- Electron 桌面版打包依赖已包含在 devDependencies
 
 ### ⚡ 安装步骤
 
@@ -74,31 +75,45 @@
     > - `express`: Web 服务器框架
     > - `multer`: 文件上传处理中间件
     > 
-    > 如果是首次设置或手动安装，也可以分别安装：
+     > 如果是首次设置或手动安装，也可以分别安装：
      ```bash
      npm install express multer
      ```
-3. **添加电子书**
+3. **选择运行方式**
 
-   将你的 `.epub`、`.txt` 或 `.pdf` 文件复制到 `books/` 文件夹中。
-
-4. **启动服务器**
-
+   **Web 服务器模式（浏览器）**
    ```bash
    # 启动服务器
    node server.js
    ```
-
    看到以下提示表示启动成功：
    ```
    E-book reader server listening at http://localhost:3000
    ```
-
    **💡 Windows 用户快捷方式：** 双击 `start.bat` 文件，会自动启动服务器并打开浏览器。
+
+   **Electron 桌面模式（开发运行）**
+   ```bash
+   npm run electron
+   ```
+   桌面版内置服务器默认端口为 `31337`，无需单独打开浏览器。
+
+   **Electron 打包**
+   ```bash
+   npm run dist
+   # 或仅构建 Windows 安装包/便携包
+   npm run dist:win
+   ```
+
+4. **添加电子书**
+
+   Web 模式：将 `.epub`、`.txt` 或 `.pdf` 文件复制到 `books/` 文件夹中。  
+   Electron 模式：点击应用内“打开书籍文件夹”，或直接放入数据目录中的 `books/`。
 
 5. **开始阅读**
 
-   在浏览器中访问 [http://localhost:3000](http://localhost:3000)，点击右侧工具栏的"书架"图标即可看到所有书籍。
+   Web 模式：在浏览器中访问 [http://localhost:3000](http://localhost:3000)。  
+   Electron 版：直接在应用窗口中使用阅读器。
 
 ## 📝 使用说明
 
@@ -162,11 +177,17 @@
 - **自动备份**: 页面关闭时自动保存，防止数据丢失
 - **格式标准**: 使用JSON格式，便于备份和迁移
 
+## 📁 数据目录说明（Electron 打包版）
+
+Electron 打包版默认将 `books/` 与 `user-data/` 放在系统用户数据目录下（Windows 的 AppData、macOS 的 Library、Linux 的 .config）。  
+可通过环境变量 `LOCAL_READ_DATA_DIR` 指定数据目录；便携版会优先使用 `PORTABLE_EXECUTABLE_DIR`（若存在）。  
+开发模式仍使用项目目录作为数据根目录。
+
 ## 📂 项目结构
 
 ```
 local_read/
-├── books/                                # 📚 存放电子书文件 (.epub, .txt, .pdf)
+├── books/                                # 📚 存放电子书文件 (.epub, .txt, .pdf)，Electron 打包版位于数据目录
 ├── src/                                  # 💻 前端源码
 │   ├── css/                              # 🎨 样式文件
 │   │   ├── base.css                            # 基础样式和CSS变量（包含EPUB图片保护样式）
@@ -189,12 +210,14 @@ local_read/
 │           ├── themeManager.js                 # 主题管理
 │           ├── txtReader.js                    # TXT阅读器（章节导航优化）
 │           └── uiController.js                 # UI控制器
-├── user-data/                            # 💾 用户数据目录 
+├── user-data/                            # 💾 用户数据目录（Electron 打包版位于数据目录）
 │   └── user-config.json                  # 用户配置文件 (自动生成)
 ├── node_modules/                         # 📦 项目依赖 (npm自动生成)
 ├── .gitignore                            # 🙈 Git忽略规则
 ├── index.html                            # 📚 书架首页
 ├── reader.html                           # 📖 阅读器页面
+├── electron-main.js                      # ⚙️ Electron 主进程
+├── preload.js                            # 🧩 Electron 预加载脚本
 ├── server.js                             # ⚙️ 后端服务器
 ├── package.json                          # 📄 项目配置文件
 ├── package-lock.json                     # 🔒 依赖版本锁定

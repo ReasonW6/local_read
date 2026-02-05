@@ -63,6 +63,10 @@ let pendingQueryBook = queryPath ? {
   name: queryName || null
 } : null;
 
+// One-time preload cache for the full user config during app initialization.
+// This is a module-level variable intended to be populated once and then merged into runtime state.
+let cachedUserConfig = null;
+
 if (initialTheme && initialTheme !== state.theme) {
   state.theme = initialTheme;
   document.body.dataset.theme = initialTheme;
@@ -211,6 +215,7 @@ async function preloadGlobalSettings() {
     if (response.ok) {
       const result = await response.json();
       const config = result.config;
+      cachedUserConfig = config;
       
       if (config.settings && config.settings.fontSize) {
         state.fontSize = config.settings.fontSize;
@@ -249,11 +254,18 @@ async function preloadGlobalSettings() {
 // 自动加载用户配置
 async function autoLoadUserConfig() {
   try {
-    const response = await fetch('/api/load-config/user-config.json');
+    let config = cachedUserConfig;
+    if (!config) {
+      const response = await fetch('/api/load-config/user-config.json');
+      if (response.ok) {
+        const result = await response.json();
+        config = result.config;
+        cachedUserConfig = config;
+      }
+    }
     
-    if (response.ok) {
-      const result = await response.json();
-      await configManager.applyConfig(result.config);
+    if (config) {
+      await configManager.applyConfig(config);
       console.log('用户配置已自动加载');
       
       if (state.bookshelf.length > 0) {
