@@ -221,6 +221,13 @@ body {
     height: 100%;
     object-fit: cover;
     transition: filter 0.3s ease;
+    /* 高质量图像渲染 - 使用平滑算法避免锯齿 */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: high-quality;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    will-change: transform;
 }
 
 body.dark-mode .qd-cover-img {

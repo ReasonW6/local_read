@@ -6,6 +6,8 @@ import { clearReader, renderTOC, updateActiveTOC, renderChapterNav } from './uiC
 
 const PDFJS_CDN_VERSION = '3.11.174';
 const PDFJS_BASE = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_CDN_VERSION}`;
+let pdfScrollSyncBound = false;
+let activePdfObserver = null;
 
 // 动态加载 pdf.js（仅加载一次）
 async function ensurePdfJsLoaded() {
@@ -241,6 +243,8 @@ function scrollToPdfPage(index, yOffset = null) {
 }
 
 function setupScrollIndexSync() {
+  if (pdfScrollSyncBound) return;
+  pdfScrollSyncBound = true;
   const scroller = document.querySelector('.main');
   if (!scroller) return;
 
@@ -457,6 +461,10 @@ export async function openPdf(arrayBuffer) {
       container.appendChild(makePagePlaceholder(i));
     }
 
+    if (activePdfObserver) {
+      activePdfObserver.disconnect();
+      activePdfObserver = null;
+    }
     const io = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return;
@@ -482,6 +490,7 @@ export async function openPdf(arrayBuffer) {
     };
 
     Array.from(container.children).forEach(ch => io.observe(ch));
+    activePdfObserver = io;
 
     // 进度恢复（页索引）
     const saved = loadProgress(state.currentFileKey);

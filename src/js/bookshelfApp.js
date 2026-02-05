@@ -13,6 +13,16 @@ const state = {
   theme: 'light'
 };
 
+const MAX_COVER_CACHE = 200;
+
+function setCoverCache(key, value) {
+  state.covers.set(key, value);
+  if (state.covers.size > MAX_COVER_CACHE) {
+    const oldestKey = state.covers.keys().next().value;
+    if (oldestKey) state.covers.delete(oldestKey);
+  }
+}
+
 const els = {
   grid: document.getElementById('bookshelfGrid'),
   empty: document.getElementById('bookshelfEmpty'),
@@ -113,35 +123,61 @@ async function loadCover(book, card) {
     return;
   }
 
-  const cached = state.covers.get(book.path);
-  if (cached) {
-    img.src = cached;
-    img.hidden = false;
-    if (placeholder) placeholder.hidden = true;
+  if (state.covers.has(book.path)) {
+    const cached = state.covers.get(book.path);
+    if (cached) {
+      img.src = cached;
+      img.hidden = false;
+      if (placeholder) placeholder.hidden = true;
+    } else {
+      if (placeholder) {
+        placeholder.textContent = book.name[0];
+        placeholder.hidden = false;
+      }
+      if (img) img.hidden = true;
+    }
     return;
   }
 
   try {
-    const response = await fetch(`${CONFIG.SERVER_API.BOOK_COVER}?path=${encodeURIComponent(book.path)}`);
-    if (response.ok) {
-      const result = await response.json();
-      if (result.cover) {
-        state.covers.set(book.path, result.cover);
-        img.src = result.cover;
-        img.hidden = false;
-        if (placeholder) placeholder.hidden = true;
+    const coverUrl = `${CONFIG.SERVER_API.BOOK_COVER}?path=${encodeURIComponent(book.path)}`;
+    const response = await fetch(coverUrl);
+    if (!response.ok) throw new Error('Cover request failed');
+
+    const contentType = response.headers.get('content-type') || '';
+    let finalSrc = '';
+
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      if (!data || !data.cover) {
+        setCoverCache(book.path, null);
+        if (placeholder) {
+          placeholder.textContent = book.name[0];
+          placeholder.hidden = false;
+        }
+        if (img) img.hidden = true;
         return;
       }
+      finalSrc = data.cover;
+    } else if (contentType.startsWith('image/')) {
+      const blob = await response.blob();
+      finalSrc = URL.createObjectURL(blob);
+    } else {
+      throw new Error('Unexpected cover response');
     }
+
+    setCoverCache(book.path, finalSrc);
+    img.src = finalSrc;
+    img.hidden = false;
+    if (placeholder) placeholder.hidden = true;
   } catch (e) {
     console.warn('Cover load failed', e);
+    if (placeholder) {
+      placeholder.textContent = book.name[0];
+      placeholder.hidden = false;
+    }
+    if (img) img.hidden = true;
   }
-
-  if (placeholder) {
-    placeholder.textContent = book.name[0];
-    placeholder.hidden = false;
-  }
-  if (img) img.hidden = true;
 }
 
 function createBookCard(book) {
