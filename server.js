@@ -623,8 +623,13 @@ app.delete('/api/fonts/:fontId', (req, res) => {
   }
 });
 
-// 启动服务器
-app.listen(PORT, () => {
-  console.log(`E-book reader server listening at http://localhost:${PORT}`);
-  console.log(`Place your .epub, .txt and .pdf files in the "${DIRS.books}" folder.`);
-});
+// 启动服务器（仅直接运行时监听，被 require 时不监听，便于测试）
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`E-book reader server listening at http://localhost:${PORT}`);
+    console.log(`Place your .epub, .txt and .pdf files in the "${DIRS.books}" folder.`);
+  });
+}
+
+// 导出供测试使用
+module.exports = { app, utils, DIRS, ALLOWED_EXTENSIONS };
