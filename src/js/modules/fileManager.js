@@ -30,7 +30,7 @@ export function saveReadingHistory() {
 export function updateReadingHistory(book) {
   const now = Date.now();
   const history = { ...state.readingHistory };
-  
+
   if (history[book.path]) {
     history[book.path].lastReadTime = now;
     history[book.path].readCount = (history[book.path].readCount || 0) + 1;
@@ -42,8 +42,8 @@ export function updateReadingHistory(book) {
       readCount: 1
     };
   }
-  
-  updateState({ 
+
+  updateState({
     readingHistory: history,
     currentlyReading: book.path
   });
@@ -57,16 +57,16 @@ export async function loadBookshelf() {
     if (!response.ok) throw new Error('Failed to fetch bookshelf');
     const books = await response.json();
     updateState({ bookshelf: books });
-    
+
     // 加载阅读历史
     loadReadingHistory();
-    
+
     // 应用启动时清除当前正在阅读状态，避免显示错误的"正在阅读"标识
     updateState({ currentlyReading: null });
-    
+
     // 清理阅读历史中已不存在的书籍
     cleanupReadingHistory(books);
-    
+
     // 加载最后阅读的书籍信息
     loadLastReadBook();
     renderBookshelf();
@@ -85,48 +85,48 @@ export async function loadBookshelf() {
 export function renderBookshelf() {
   const bookshelfList = DOM.bookshelfList();
   if (!bookshelfList) return;
-  
+
   bookshelfList.innerHTML = '';
   if (state.bookshelf.length === 0) {
     bookshelfList.innerHTML = '<div class="muted" style="padding: 10px;">书架为空，请将书籍文件放入 "books" 文件夹后点击 "刷新书架"。</div>';
     return;
   }
-  
+
   // 按阅读历史排序：当前正在阅读的书籍最前，然后按最后阅读时间排序，未读过的书籍最后
   const sortedBooks = [...state.bookshelf].sort((a, b) => {
     const aIsCurrentlyReading = state.currentlyReading === a.path;
     const bIsCurrentlyReading = state.currentlyReading === b.path;
-    
+
     // 当前正在阅读的书籍排在最前面（实际阅读中才会有这个状态）
     if (aIsCurrentlyReading && !bIsCurrentlyReading) return -1;
     if (!aIsCurrentlyReading && bIsCurrentlyReading) return 1;
-    
+
     // 按阅读历史排序（最近阅读的在前）
     const aHistory = state.readingHistory[a.path];
     const bHistory = state.readingHistory[b.path];
-    
+
     // 有阅读历史的排在无阅读历史的前面
     if (aHistory && !bHistory) return -1;
     if (!aHistory && bHistory) return 1;
-    
+
     // 都有阅读历史，按最后阅读时间降序排列（最近阅读的在前）
     if (aHistory && bHistory) {
       return bHistory.lastReadTime - aHistory.lastReadTime;
     }
-    
+
     // 都没有阅读历史，按名称排序
     return a.name.localeCompare(b.name, 'zh-CN');
   });
-  
+
   sortedBooks.forEach((book) => {
     const el = document.createElement('div');
     el.className = 'book-item';
-    
+
     // 检查书籍状态
     const isCurrentlyReading = state.currentlyReading === book.path;
     const history = state.readingHistory[book.path];
     const isLastRead = !isCurrentlyReading && state.lastReadBook && book.path === state.lastReadBook.path;
-    
+
     // 应用样式类
     if (isCurrentlyReading) {
       el.classList.add('currently-reading');
@@ -135,7 +135,7 @@ export function renderBookshelf() {
     } else if (history) {
       el.classList.add('has-history');
     }
-    
+
     // 构建显示信息
     let statusInfo = '';
     if (isCurrentlyReading) {
@@ -146,14 +146,28 @@ export function renderBookshelf() {
       const timeAgo = formatTimeAgo(history.lastReadTime);
       statusInfo = `<span class="reading-history">📖 ${timeAgo}</span>`;
     }
-    
-    el.innerHTML = `
-      <div style="flex:1">
-        <div class="book-title" style="font-weight:600">${book.name}</div>
-        <div class="muted book-path" style="font-size:12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${book.path}</div>
-        ${statusInfo ? `<div class="book-status" style="font-size:11px; margin-top:2px;">${statusInfo}</div>` : ''}
-      </div>
-    `;
+
+    // BUG-2: 使用 DOM API 防止 XSS（书名/路径可能包含 HTML 特殊字符）
+    const wrapper = document.createElement('div');
+    wrapper.style.flex = '1';
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'book-title';
+    titleDiv.style.fontWeight = '600';
+    titleDiv.textContent = book.name;
+    wrapper.appendChild(titleDiv);
+    const pathDiv = document.createElement('div');
+    pathDiv.className = 'muted book-path';
+    pathDiv.style.cssText = 'font-size:12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+    pathDiv.textContent = book.path;
+    wrapper.appendChild(pathDiv);
+    if (statusInfo) {
+      const statusDiv = document.createElement('div');
+      statusDiv.className = 'book-status';
+      statusDiv.style.cssText = 'font-size:11px; margin-top:2px;';
+      statusDiv.innerHTML = statusInfo; // statusInfo 是内部生成的安全 HTML
+      wrapper.appendChild(statusDiv);
+    }
+    el.appendChild(wrapper);
     el.onclick = () => window.openBookFromServer(book);
     bookshelfList.appendChild(el);
   });
@@ -166,23 +180,23 @@ export async function openBookFromServer(book) {
     if (!response.ok) throw new Error(`Book not found or failed to load: ${book.name}`);
     const fileData = await response.arrayBuffer();
     updateState({ currentFileKey: getFileKey(book.path) });
-    
+
     // 更新阅读历史
     updateReadingHistory(book);
-    
+
     // 清除"上次阅读"标识，因为现在有新的正在阅读的书籍了
     updateState({ lastReadBook: null });
     localStorage.removeItem(CONFIG.STORAGE_KEYS.LAST_READ_BOOK);
-    
+
     // 重新渲染书架以显示最新的阅读状态
     renderBookshelf();
-    
+
     // Set book metadata
     const bookMeta = DOM.bookMeta();
     if (bookMeta) {
       bookMeta.textContent = `书名: ${book.name}`;
     }
-    
+
     return { book, fileData };
   } catch (error) {
     console.error('Error opening book from server:', error);
@@ -194,8 +208,8 @@ export async function openBookFromServer(book) {
 // Read ArrayBuffer with encoding detection
 export async function readArrayBufferWithEncoding(arrayBuffer) {
   const decoderUtf8 = new TextDecoder('utf-8', { fatal: true });
-  try { 
-    return decoderUtf8.decode(arrayBuffer); 
+  try {
+    return decoderUtf8.decode(arrayBuffer);
   } catch (e) {
     console.log("UTF-8 decoding failed, trying GBK...");
     const decoderGbk = new TextDecoder('gbk');
@@ -240,28 +254,28 @@ export function loadLastReadBook() {
 }
 
 // Progress saving and loading
-export function saveProgress(key, data) { 
-  if (!key) return; 
-  try { 
-    localStorage.setItem(key, JSON.stringify(data)); 
+export function saveProgress(key, data) {
+  if (!key) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
     const indicator = document.getElementById('save-indicator');
     if (indicator) {
       indicator.style.opacity = '1';
       setTimeout(() => { indicator.style.opacity = '0'; }, 1500);
     }
-  } catch (e) { 
-    console.warn(e); 
-  } 
+  } catch (e) {
+    console.warn(e);
+  }
 }
 
-export function loadProgress(key) { 
-  if (!key) return null; 
-  try { 
-    const raw = localStorage.getItem(key); 
-    return raw ? JSON.parse(raw) : null; 
-  } catch (e) { 
-    return null; 
-  } 
+export function loadProgress(key) {
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 // 清理阅读历史中已不存在的书籍
@@ -269,7 +283,7 @@ function cleanupReadingHistory(currentBooks) {
   const currentBookPaths = new Set(currentBooks.map(book => book.path));
   const history = { ...state.readingHistory };
   let hasChanges = false;
-  
+
   // 移除不存在的书籍历史记录
   Object.keys(history).forEach(path => {
     if (!currentBookPaths.has(path)) {
@@ -277,13 +291,13 @@ function cleanupReadingHistory(currentBooks) {
       hasChanges = true;
     }
   });
-  
+
   // 清理当前正在阅读的书籍标记
   if (state.currentlyReading && !currentBookPaths.has(state.currentlyReading)) {
     updateState({ currentlyReading: null });
     hasChanges = true;
   }
-  
+
   if (hasChanges) {
     updateState({ readingHistory: history });
     saveReadingHistory();

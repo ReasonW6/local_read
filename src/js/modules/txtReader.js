@@ -57,15 +57,15 @@ export async function openTxt(text, fileName) {
       txtPages.push((title + '\n\n' + (content || '')).trim());
     }
   }
-  
+
   if (chapters.length === 0) {
     chapters.push({ label: fileName, href: '#txt-0' });
     txtPages.push(text);
   }
-  
+
   updateState({ chapters, txtPages });
   renderTOC();
-  
+
   const saved = loadProgress(state.currentFileKey);
   displayTxtChapter(saved?.idx || 0);
 }
@@ -73,7 +73,7 @@ export async function openTxt(text, fileName) {
 // Display specific TXT chapter
 export function displayTxtChapter(idx) {
   if (idx < 0 || idx >= state.txtPages.length) return;
-  
+
   updateState({ currentIndex: idx });
   const raw = state.txtPages[idx] || '';
   const lines = raw.replace(/\r/g, '').split('\n');
@@ -82,16 +82,18 @@ export function displayTxtChapter(idx) {
     if (line.trim() === '') return '<br>';
     return '<p>' + line.trim().replace(/</g, '&lt;') + '</p>';
   }).join('');
-  
+
   const readerInner = DOM.readerInner();
   if (readerInner) {
-    readerInner.innerHTML = `<h1>${titleText}</h1>${contentHtml}`;
+    // BUG-3: 转义标题防止 XSS
+    const escapedTitle = titleText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    readerInner.innerHTML = `<h1>${escapedTitle}</h1>${contentHtml}`;
   }
-  
+
   updateActiveTOC();
   renderChapterNav();
   applyTxtFontSize();
-  
+
   // 滚动到页面顶部 - 使用 requestAnimationFrame 确保在DOM更新后执行
   requestAnimationFrame(() => {
     const mainContainer = document.querySelector('.main');
@@ -112,7 +114,7 @@ export function applyTxtFontSize() {
 // Navigate to chapter in TXT
 export function goToTxtChapter(index) {
   if (index < 0 || index >= state.chapters.length || state.isNavigating) return;
-  
+
   setNavigating(true); // 上锁
   displayTxtChapter(index);
   setNavigating(false); // TXT是同步操作，立即解锁

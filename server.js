@@ -59,13 +59,14 @@ Object.values(DIRS).forEach(dir => {
 
 // 中间件配置
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(__dirname));
+// PERF-3: 添加静态文件缓存头，减少重复文件读取
+app.use(express.static(__dirname, { maxAge: '1h' }));
 
 // 工具函数
 const utils = {
   // 规范化相对路径
   normalizePath: (p = '') => p.split(path.sep).join('/'),
-  
+
   // 解析书籍路径（带安全检查）
   resolveBookPath: (relativePath = '') => {
     const normalized = path.normalize(relativePath).replace(/^([\.\\/])+/, '');
@@ -90,7 +91,7 @@ const utils = {
     }
     return resolved;
   },
-  
+
   // 清理空文件夹
   cleanupEmptyFolders: (startPath) => {
     let current = path.dirname(startPath);
@@ -108,10 +109,10 @@ const utils = {
       }
     }
   },
-  
+
   // 解码文件名
   decodeFilename: (filename) => Buffer.from(filename, 'latin1').toString('utf8'),
-  
+
   // 检查文件扩展名是否支持
   isAllowedExtension: (filename) => {
     const ext = path.extname(filename).toLowerCase();
@@ -131,7 +132,7 @@ const storage = multer.diskStorage({
     const originalName = utils.decodeFilename(file.originalname);
     let finalName = originalName;
     let counter = 1;
-    
+
     while (fs.existsSync(path.join(DIRS.books, finalName))) {
       const ext = path.extname(originalName);
       const nameWithoutExt = path.basename(originalName, ext);
@@ -151,7 +152,9 @@ const upload = multer({
     } else {
       cb(new Error('只支持 .epub, .txt, .pdf 文件格式'));
     }
-  }
+  },
+  // BUG-7: 添加文件大小限制（500MB），防止超大文件占满磁盘/内存
+  limits: { fileSize: 500 * 1024 * 1024 }
 });
 
 // EPUB封面提取
@@ -479,7 +482,7 @@ const fontStorage = multer.diskStorage({
     const originalName = utils.decodeFilename(file.originalname);
     let finalName = originalName;
     let counter = 1;
-    
+
     while (fs.existsSync(path.join(DIRS.fonts, finalName))) {
       const ext = path.extname(originalName);
       const nameWithoutExt = path.basename(originalName, ext);
@@ -512,7 +515,7 @@ app.get('/api/fonts', (req, res) => {
     if (!fs.existsSync(DIRS.fonts)) {
       return res.json([]);
     }
-    
+
     const files = fs.readdirSync(DIRS.fonts);
     const fonts = files
       .filter(file => ALLOWED_FONT_EXTENSIONS.includes(path.extname(file).toLowerCase()))
@@ -520,7 +523,7 @@ app.get('/api/fonts', (req, res) => {
         const ext = path.extname(file);
         const nameWithoutExt = path.basename(file, ext);
         const stats = fs.statSync(path.join(DIRS.fonts, file));
-        
+
         return {
           id: file,
           name: nameWithoutExt,
@@ -530,7 +533,7 @@ app.get('/api/fonts', (req, res) => {
           addedAt: stats.birthtimeMs || stats.ctimeMs
         };
       });
-    
+
     res.json(fonts);
   } catch (error) {
     console.error('Error getting fonts:', error);
@@ -544,10 +547,10 @@ app.post('/api/fonts/upload', fontUpload.single('font'), (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: '没有上传文件' });
     }
-    
+
     const ext = path.extname(req.file.filename);
     const nameWithoutExt = path.basename(req.file.filename, ext);
-    
+
     res.json({
       success: true,
       font: {
@@ -569,26 +572,27 @@ app.get('/api/fonts/file/:fontId', (req, res) => {
   try {
     const fontId = req.params.fontId;
     const fontPath = path.join(DIRS.fonts, fontId);
-    
+
     // 安全检查
     const resolved = path.resolve(fontPath);
     if (!resolved.startsWith(path.resolve(DIRS.fonts))) {
       return res.status(403).json({ error: '无效的字体路径' });
     }
-    
+
     if (!fs.existsSync(fontPath)) {
       return res.status(404).json({ error: '字体不存在' });
     }
-    
+
     const ext = path.extname(fontId).toLowerCase();
     const mimeType = FONT_MIME_TYPES[ext] || 'application/octet-stream';
-    
+
     res.set({
       'Content-Type': mimeType,
       'Cache-Control': 'public, max-age=31536000'
     });
-    
-    res.sendFile(fontPath);
+
+    // BUG-5: 使用 resolved 绝对路径，Express 5 的 sendFile 要求绝对路径
+    res.sendFile(resolved);
   } catch (error) {
     console.error('Error serving font:', error);
     res.status(500).json({ error: '获取字体失败' });
@@ -600,17 +604,17 @@ app.delete('/api/fonts/:fontId', (req, res) => {
   try {
     const fontId = req.params.fontId;
     const fontPath = path.join(DIRS.fonts, fontId);
-    
+
     // 安全检查
     const resolved = path.resolve(fontPath);
     if (!resolved.startsWith(path.resolve(DIRS.fonts))) {
       return res.status(403).json({ error: '无效的字体路径' });
     }
-    
+
     if (!fs.existsSync(fontPath)) {
       return res.status(404).json({ error: '字体不存在' });
     }
-    
+
     fs.unlinkSync(fontPath);
     res.json({ success: true });
   } catch (error) {

@@ -448,16 +448,29 @@ async function openBookFromQueryIfNeeded(booksFromLoad) {
 
 let lastReadingPercentage = 0;
 
+// PERF-2: 缓存 DOM 元素引用，避免每次调用时重复查询
+let _cachedScroller = null;
+let _cachedBar = null;
+let _cachedText = null;
+let _domCacheInvalid = true;
+
+function invalidateProgressDomCache() {
+  _domCacheInvalid = true;
+}
+
 function updateReadingProgress() {
-  const scroller = document.querySelector('.main');
-  const bar = document.getElementById('readingProgressBar');
-  const text = document.getElementById('readingProgressText');
-  if (!scroller || (!bar && !text)) return;
-  const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
-  const pct = Math.min(100, Math.max(0, (scroller.scrollTop / max) * 100));
+  if (_domCacheInvalid) {
+    _cachedScroller = document.querySelector('.main');
+    _cachedBar = document.getElementById('readingProgressBar');
+    _cachedText = document.getElementById('readingProgressText');
+    _domCacheInvalid = false;
+  }
+  if (!_cachedScroller || (!_cachedBar && !_cachedText)) return;
+  const max = Math.max(1, _cachedScroller.scrollHeight - _cachedScroller.clientHeight);
+  const pct = Math.min(100, Math.max(0, (_cachedScroller.scrollTop / max) * 100));
   lastReadingPercentage = pct;
-  if (bar) bar.style.width = pct.toFixed(2) + '%';
-  if (text) text.textContent = Math.round(pct) + '%';
+  if (_cachedBar) _cachedBar.style.width = pct.toFixed(2) + '%';
+  if (_cachedText) _cachedText.textContent = Math.round(pct) + '%';
 }
 
 function restoreScrollPositionByPercentage() {
@@ -475,7 +488,17 @@ function restoreScrollPositionByPercentage() {
 function initReadingProgress() {
   const scroller = document.querySelector('.main');
   if (!scroller) return;
-  scroller.addEventListener('scroll', updateReadingProgress, { passive: true });
+  // PERF-1: 使用 rAF 节流 scroll 事件，避免高频 DOM 读写
+  let rafPending = false;
+  scroller.addEventListener('scroll', () => {
+    if (!rafPending) {
+      rafPending = true;
+      requestAnimationFrame(() => {
+        updateReadingProgress();
+        rafPending = false;
+      });
+    }
+  }, { passive: true });
   window.addEventListener('resize', updateReadingProgress);
   requestAnimationFrame(updateReadingProgress);
 }
@@ -941,12 +964,19 @@ function setupEventListeners() {
       
       updateState({ currentlyReading: null });
       
+      // BUG-1: 检查 sendBeacon 返回值，失败时使用同步 XHR 作为后备
       try {
         const config = configManager.collectAllData();
-        const blob = new Blob([JSON.stringify({ config, filename: 'user-config.json' })], {
-          type: 'application/json'
-        });
-        navigator.sendBeacon('/api/save-config', blob);
+        const jsonStr = JSON.stringify({ config, filename: 'user-config.json' });
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const sent = navigator.sendBeacon('/api/save-config', blob);
+        if (!sent) {
+          // sendBeacon 失败（如数据量过大），使用同步 XHR 后备
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/save-config', false);
+          xhr.setRequestHeader('Content-Type', 'application/json');
+          xhr.send(jsonStr);
+        }
       } catch (e) {
         console.warn('自动保存失败:', e);
       }

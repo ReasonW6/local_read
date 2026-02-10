@@ -16,10 +16,21 @@ const state = {
 const MAX_COVER_CACHE = 200;
 
 function setCoverCache(key, value) {
+  // BUG-6: 释放被替换/淘汰的 ObjectURL，防止内存泄漏
+  const oldValue = state.covers.get(key);
+  if (oldValue && oldValue.startsWith('blob:')) {
+    URL.revokeObjectURL(oldValue);
+  }
   state.covers.set(key, value);
   if (state.covers.size > MAX_COVER_CACHE) {
     const oldestKey = state.covers.keys().next().value;
-    if (oldestKey) state.covers.delete(oldestKey);
+    if (oldestKey) {
+      const evicted = state.covers.get(oldestKey);
+      if (evicted && evicted.startsWith('blob:')) {
+        URL.revokeObjectURL(evicted);
+      }
+      state.covers.delete(oldestKey);
+    }
   }
 }
 
@@ -325,7 +336,7 @@ function setupEventListeners() {
       }
     });
   }
-  
+
   // 初始化添加书籍弹窗（传入上传处理函数）
   initAddBooksModal(async (files) => {
     await uploadBooks(files);

@@ -59,6 +59,7 @@ export function addBookmark() {
     id: Date.now().toString(),
     title: bookmarkTitle.trim(),
     level: level,
+    timestamp: Date.now(), // BUG-9: 增加数字时间戳用于可靠排序
     bookKey: state.currentFileKey,
     bookName: state.book ? (state.book.package ? state.book.package.metadata.title : '当前书籍') : '当前书籍',
     location: location,
@@ -67,7 +68,7 @@ export function addBookmark() {
 
   // 保存书签
   saveBookmark(bookmark);
-  
+
   // 显示成功提示
   showIndicator('书签已添加');
 
@@ -82,7 +83,7 @@ export function addBookmark() {
 export function saveBookmark(bookmark) {
   const bookmarks = getBookmarksForCurrentBook();
   bookmarks.push(bookmark);
-  
+
   try {
     const allBookmarks = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.BOOKMARKS) || '{}');
     allBookmarks[state.currentFileKey] = bookmarks;
@@ -95,7 +96,7 @@ export function saveBookmark(bookmark) {
 // Get bookmarks for current book
 export function getBookmarksForCurrentBook() {
   if (!state.currentFileKey) return [];
-  
+
   try {
     const allBookmarks = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.BOOKMARKS) || '{}');
     return allBookmarks[state.currentFileKey] || [];
@@ -116,37 +117,40 @@ export function loadBookmarks() {
 export function renderBookmarkList() {
   const bookmarkList = DOM.bookmarkList();
   if (!bookmarkList) return;
-  
+
   bookmarkList.innerHTML = '';
-  
+
   if (state.bookmarks.length === 0) {
     bookmarkList.innerHTML = '<div class="muted" style="padding: 10px;">暂无书签，在阅读时点击"书签"按钮添加。</div>';
     return;
   }
-  
-  // 按创建时间倒序排列（最新的在前面）
+
+  // BUG-9: 使用数字时间戳排序，locale 日期字符串无法可靠解析
   const sortedBookmarks = [...state.bookmarks].sort((a, b) => {
-    return new Date(b.createdAt) - new Date(a.createdAt);
+    return (b.timestamp || 0) - (a.timestamp || 0);
   });
-  
+
+  // BUG-4: HTML 转义函数，防止 XSS
+  const escHtml = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
   sortedBookmarks.forEach(bookmark => {
     const el = document.createElement('div');
     const lvl = bookmark.level || 1;
     el.className = 'bookmark-item level-' + lvl;
     el.style.paddingLeft = ((lvl - 1) * 12) + 'px';
     el.innerHTML = `
-      <div class="bookmark-title"><span style="display:inline-block;min-width:28px;padding:2px 6px;margin-right:6px;border-radius:10px;font-size:12px;opacity:.7;background:rgba(127,127,127,.15);">Lv${lvl}</span>${bookmark.title}</div>
-      <div class="bookmark-location">${bookmark.location.chapterTitle}</div>
-      <div class="bookmark-time">${bookmark.createdAt}</div>
-      <button class="bookmark-delete" onclick="window.removeBookmark('${bookmark.id}')" title="删除书签">×</button>
+      <div class="bookmark-title"><span style="display:inline-block;min-width:28px;padding:2px 6px;margin-right:6px;border-radius:10px;font-size:12px;opacity:.7;background:rgba(127,127,127,.15);">Lv${lvl}</span>${escHtml(bookmark.title)}</div>
+      <div class="bookmark-location">${escHtml(bookmark.location.chapterTitle)}</div>
+      <div class="bookmark-time">${escHtml(bookmark.createdAt)}</div>
+      <button class="bookmark-delete" onclick="window.removeBookmark('${escHtml(bookmark.id)}')" title="删除书签">×</button>
     `;
-    
+
     el.onclick = (e) => {
       if (e.target.className !== 'bookmark-delete') {
         goToBookmark(bookmark);
       }
     };
-    
+
     bookmarkList.appendChild(el);
   });
 }
@@ -154,9 +158,9 @@ export function renderBookmarkList() {
 // Go to bookmark location
 export function goToBookmark(bookmark) {
   if (!bookmark.location) return;
-  
+
   const location = bookmark.location;
-  
+
   if (location.type === 'epub' && state.type === 'epub' && state.rendition) {
     updateState({ isNavigating: true });
     state.rendition.display(location.cfi).then(() => {
@@ -185,7 +189,7 @@ export function goToBookmark(bookmark) {
       goToPdfChapter(idx);
     });
   }
-  
+
   // 关闭侧边栏
   const sidebar = DOM.sidebar();
   if (sidebar) {
@@ -196,17 +200,17 @@ export function goToBookmark(bookmark) {
 // Remove bookmark
 export function removeBookmark(bookmarkId) {
   if (!confirm('确定要删除这个书签吗？')) return;
-  
+
   try {
     const allBookmarks = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.BOOKMARKS) || '{}');
     const currentBookmarks = allBookmarks[state.currentFileKey] || [];
-    
+
     allBookmarks[state.currentFileKey] = currentBookmarks.filter(b => b.id !== bookmarkId);
     localStorage.setItem(CONFIG.STORAGE_KEYS.BOOKMARKS, JSON.stringify(allBookmarks));
-    
+
     // 更新状态并重新渲染
     loadBookmarks();
-    
+
     // 显示删除成功提示
     showIndicator('书签已删除');
   } catch (e) {
@@ -221,17 +225,17 @@ export function clearAllBookmarks() {
     alert('当前书籍没有书签');
     return;
   }
-  
+
   if (!confirm(`确定要清空当前书籍的所有 ${state.bookmarks.length} 个书签吗？此操作不可撤销。`)) return;
-  
+
   try {
     const allBookmarks = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.BOOKMARKS) || '{}');
     allBookmarks[state.currentFileKey] = [];
     localStorage.setItem(CONFIG.STORAGE_KEYS.BOOKMARKS, JSON.stringify(allBookmarks));
-    
+
     // 更新状态并重新渲染
     loadBookmarks();
-    
+
     // 显示清空成功提示
     showIndicator('书签已清空');
   } catch (e) {
@@ -246,7 +250,7 @@ function showIndicator(message) {
   if (indicator) {
     indicator.textContent = message;
     indicator.style.opacity = '1';
-    setTimeout(() => { 
+    setTimeout(() => {
       indicator.style.opacity = '0';
       setTimeout(() => {
         indicator.textContent = '已保存';

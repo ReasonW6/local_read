@@ -81,25 +81,25 @@ async function renderPdfPage(pdfDoc, pageNum, container, renderedSet, progress) 
 
 async function buildChaptersFromOutline(pdfDoc, outline) {
   const chapters = [];
-  
+
   async function resolveItem(item, level = 1) {
     const lvl = Math.max(1, Math.min(3, level));
     try {
       let dest = item.dest || null;
       let pageIndex = null;
       let yOffset = null;
-      
+
       // 处理目标引用
       if (typeof dest === 'string') {
         dest = await pdfDoc.getDestination(dest);
       }
-      
+
       if (Array.isArray(dest) && dest.length > 0) {
         // 获取页面索引
         if (dest[0] && typeof dest[0] === 'object') {
           pageIndex = await pdfDoc.getPageIndex(dest[0]);
         }
-        
+
         // 解析目标位置信息
         // PDF目标格式: [page, type, left, top, right, bottom, zoom]
         // 常见类型: /XYZ (left, top, zoom), /Fit, /FitH (top), /FitV (left)
@@ -118,7 +118,7 @@ async function buildChaptersFromOutline(pdfDoc, outline) {
           }
         }
       }
-      
+
       if (pageIndex !== null) {
         const title = (item.title || `第${pageIndex + 1}页`).trim();
         chapters.push({
@@ -133,7 +133,7 @@ async function buildChaptersFromOutline(pdfDoc, outline) {
     } catch (error) {
       console.warn('Failed to resolve outline item:', item.title, error);
     }
-    
+
     // 递归处理子项
     if (Array.isArray(item.items)) {
       for (const sub of item.items) {
@@ -141,7 +141,7 @@ async function buildChaptersFromOutline(pdfDoc, outline) {
       }
     }
   }
-  
+
   // 处理所有大纲项
   for (const item of outline) {
     await resolveItem(item, 1);
@@ -158,11 +158,11 @@ async function buildChaptersFromOutline(pdfDoc, outline) {
     }
     return 0;
   });
-  
+
   // 去重：相同页面且标题相同的项目只保留一个
   const uniqueChapters = [];
   const seen = new Set();
-  
+
   for (const chapter of chapters) {
     const key = `${chapter.pageIndex}-${chapter.label}`;
     if (!seen.has(key)) {
@@ -176,34 +176,34 @@ async function buildChaptersFromOutline(pdfDoc, outline) {
       });
     }
   }
-  
+
   return uniqueChapters;
 }
 
 function scrollToPdfPage(index, yOffset = null) {
   const pageEl = document.getElementById(`pdf-page-${index + 1}`);
   if (!pageEl) return;
-  
+
   const scroller = document.querySelector('.main');
   if (!scroller) {
     pageEl.scrollIntoView({ behavior: 'auto', block: 'start' });
     return;
   }
-  
+
   // 强制渲染目标页面
   if (window.forceRenderPdfPage) {
     window.forceRenderPdfPage(index + 1);
   }
-  
+
   // 使用简单可靠的滚动方式
   pageEl.scrollIntoView({ behavior: 'auto', block: 'start' });
-  
+
   // 如果有精确位置要求，等待渲染后再调整
   if (yOffset !== null && typeof yOffset === 'number') {
     const adjustPosition = async () => {
       // 等待一段时间确保页面渲染
       await new Promise(resolve => setTimeout(resolve, 300));
-      
+
       const canvas = pageEl.querySelector('canvas');
       if (canvas && canvas.offsetHeight > 0) {
         try {
@@ -212,21 +212,21 @@ function scrollToPdfPage(index, yOffset = null) {
           if (pdfDoc) {
             const page = await pdfDoc.getPage(pageNum);
             const viewport = page.getViewport({ scale: 1 });
-            
+
             // 计算缩放比例和偏移
             const canvasHeight = canvas.offsetHeight;
             const scale = canvasHeight / viewport.height;
             const pdfHeight = viewport.height;
-            
+
             // PDF坐标转换：Y轴向上为正 -> 浏览器Y轴向下为正
             const offsetFromTop = pdfHeight - yOffset;
             const pixelOffset = Math.max(0, offsetFromTop * scale);
-            
+
             // 获取页面当前位置并调整
             const pageRect = pageEl.getBoundingClientRect();
             const scrollerRect = scroller.getBoundingClientRect();
             const currentPageTop = scroller.scrollTop + pageRect.top - scrollerRect.top;
-            
+
             scroller.scrollTo({
               top: currentPageTop + pixelOffset,
               behavior: 'smooth'
@@ -237,7 +237,7 @@ function scrollToPdfPage(index, yOffset = null) {
         }
       }
     };
-    
+
     adjustPosition();
   }
 }
@@ -250,41 +250,41 @@ function setupScrollIndexSync() {
 
   let ticking = false;
   let lastUpdateTime = 0;
-  
+
   function update() {
     ticking = false;
-    
+
     // 如果正在导航，跳过更新
     if (state.isNavigating) return;
-    
+
     // 限制更新频率
     const now = Date.now();
     if (now - lastUpdateTime < 100) return;
     lastUpdateTime = now;
-    
+
     const pages = Array.from(document.querySelectorAll('.pdf-page'));
     if (pages.length === 0) return;
-    
+
     const scrollerRect = scroller.getBoundingClientRect();
     const viewportCenter = scrollerRect.top + scrollerRect.height / 2;
-    
+
     let bestIdx = state.currentIndex || 0;
     let bestDelta = Infinity;
-    
+
     pages.forEach((el, i) => {
       const rect = el.getBoundingClientRect();
       const pageCenter = rect.top + rect.height / 2;
       const delta = Math.abs(pageCenter - viewportCenter);
-      
+
       if (delta < bestDelta) {
         bestDelta = delta;
         bestIdx = i;
       }
     });
-    
+
     if (bestIdx !== state.currentIndex) {
       updateState({ currentIndex: bestIdx });
-      
+
       // 更新章节索引
       const chapters = state.chapters || [];
       let chapterIndex = -1;
@@ -297,7 +297,7 @@ function setupScrollIndexSync() {
       if (chapterIndex >= 0) {
         updateState({ currentChapterIndex: chapterIndex });
       }
-      
+
       updateActiveTOC();
       renderChapterNav();
     }
@@ -421,6 +421,12 @@ function createPdfRenderProgress(total) {
 // 打开 PDF
 export async function openPdf(arrayBuffer) {
   clearReader();
+  // BUG-8: 重置滚动同步标志，确保新 PDF 重新绑定
+  pdfScrollSyncBound = false;
+  if (activePdfObserver) {
+    activePdfObserver.disconnect();
+    activePdfObserver = null;
+  }
   try {
     const pdfjsLib = await ensurePdfJsLoaded();
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
@@ -441,7 +447,7 @@ export async function openPdf(arrayBuffer) {
       if (outline && outline.length) {
         chapters = await buildChaptersFromOutline(pdfDoc, outline);
       }
-    } catch {}
+    } catch { }
     if (!chapters || chapters.length === 0) {
       chapters = Array.from({ length: pageCount }, (_, i) => ({
         label: `第${i + 1}页`,
@@ -470,22 +476,22 @@ export async function openPdf(arrayBuffer) {
         if (!entry.isIntersecting) return;
         const id = entry.target.id; // pdf-page-N
         const num = Number(id.split('-').pop());
-        
+
         // 确保页面渲染
         if (!renderedSet.has(num)) {
-          renderPdfPage(pdfDoc, num, container, renderedSet, progress).catch(() => {});
+          renderPdfPage(pdfDoc, num, container, renderedSet, progress).catch(() => { });
         }
       });
-    }, { 
-      root: document.querySelector('.main') || null, 
+    }, {
+      root: document.querySelector('.main') || null,
       rootMargin: '500px 0px', // 增大预渲染范围
-      threshold: 0.01 
+      threshold: 0.01
     });
 
     // 添加强制渲染函数，用于目录跳转
     window.forceRenderPdfPage = (pageNum) => {
       if (!renderedSet.has(pageNum) && pageNum >= 1 && pageNum <= pageCount) {
-        renderPdfPage(pdfDoc, pageNum, container, renderedSet, progress).catch(() => {});
+        renderPdfPage(pdfDoc, pageNum, container, renderedSet, progress).catch(() => { });
       }
     };
 
@@ -529,7 +535,7 @@ export function goToPdfChapter(target) {
   } else {
     // 直接页面跳转：传入页码
     page = Math.max(0, Math.min(pageCount - 1, Number(target) || 0));
-    
+
     // 找到对应的章节索引（用于高亮目录）
     for (let i = chapters.length - 1; i >= 0; i--) {
       if (chapters[i].pageIndex <= page) {
@@ -541,16 +547,16 @@ export function goToPdfChapter(target) {
 
   // 设置导航状态，防止滚动同步干扰
   setNavigating(true);
-  
+
   // 更新状态
-  updateState({ 
+  updateState({
     currentIndex: page,
     currentChapterIndex: chapterIndex >= 0 ? chapterIndex : -1
   });
-  
+
   // 立即执行跳转
   scrollToPdfPage(page, yOffset);
-  
+
   // 延迟更新UI，确保跳转完成
   setTimeout(() => {
     updateActiveTOC();
