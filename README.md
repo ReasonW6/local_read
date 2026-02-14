@@ -233,6 +233,105 @@ local_read/
   - **ePub.js**: 用于解析和渲染 EPUB 文件
   - **PDF.js**: 用于解析和渲染 PDF 文件
   - **JSZip**: 用于处理压缩文件
+- **测试框架**: Vitest, Supertest
+
+## 🧪 测试用例
+
+项目包含完整的单元测试和集成测试，使用 Vitest 作为测试框架。
+
+### 📋 测试结构
+
+```
+tests/
+├── frontend/           # 前端单元测试
+│   ├── config.test.js      # 配置模块测试
+│   └── utils.test.js       # 工具函数测试
+└── server/             # 服务端测试
+    ├── api.test.js         # API 集成测试
+    └── utils.test.js       # 服务端工具函数测试
+```
+
+### 🔍 测试覆盖范围
+
+#### **前端测试** (`tests/frontend/`)
+
+**配置模块测试** (`config.test.js`)
+- ✅ `getFileKey` - 文件路径键生成函数
+  - 路径前缀添加测试
+  - 空字符串处理测试
+  - Windows 路径处理测试
+  - 中文路径处理测试
+- ✅ `CONFIG` - 配置常量验证
+  - 字体大小限制常量
+  - API 路径定义
+  - 存储键定义
+  - 主题定义
+  - 侧边栏视图定义
+
+**工具函数测试** (`utils.test.js`)
+- ✅ `DEFAULT_READING_PREFS` - 默认阅读偏好设置
+- ✅ `clamp` - 数值范围限制函数（11个测试用例）
+- ✅ `normalizePrefs` - 阅读偏好标准化（5个测试用例）
+- ✅ `computeVerticalPadding` - 垂直边距计算（3个测试用例）
+- ✅ `formatFileSize` - 文件大小格式化（4个测试用例）
+- ✅ `formatDecimal` - 小数格式化（4个测试用例）
+- ✅ `formatTimeAgo` - 时间相对显示（6个测试用例）
+- ✅ `getFileExtension` - 文件扩展名提取（3个测试用例）
+- ✅ `deriveBookNameFromPath` - 从路径提取书名（5个测试用例）
+- ✅ `debounce` - 防抖函数（2个测试用例）
+- ✅ `throttle` - 节流函数（3个测试用例）
+
+#### **服务端测试** (`tests/server/`)
+
+**API 集成测试** (`api.test.js`)
+- ✅ **书籍管理功能**
+  - `GET /api/bookshelf` - 获取书籍列表
+  - `POST /api/upload` - 上传书籍（支持的格式、格式验证）
+  - `GET /api/book` - 读取书籍内容（成功读取、404处理）
+  - `DELETE /api/book` - 删除书籍（成功删除、404处理）
+  - `GET /api/book-cover` - 获取书籍封面（不同格式处理）
+- ✅ **配置管理功能**
+  - `POST /api/save-config` - 保存配置
+  - `GET /api/config-list` - 获取配置列表
+  - `GET /api/load-config/:filename` - 加载配置（成功加载、404处理）
+  - `DELETE /api/config/:filename` - 删除配置
+- ✅ **字体管理功能**
+  - `GET /api/fonts` - 获取字体列表
+
+**服务端工具函数测试** (`utils.test.js`)
+- ✅ `normalizePath` - 路径标准化（4个测试用例）
+- ✅ `resolveBookPath` - 书籍路径解析（含安全性测试，5个测试用例）
+- ✅ `resolveConfigPath` - 配置文件路径解析（含安全性测试，5个测试用例）
+- ✅ `decodeFilename` - 文件名解码（2个测试用例）
+- ✅ `isAllowedExtension` - 文件扩展名验证（7个测试用例）
+
+### 🚀 运行测试
+
+```bash
+# 运行所有测试
+npm test
+
+# 运行测试并显示覆盖率
+npm run test:coverage
+
+# 监听模式运行测试（开发时使用）
+npm run test:watch
+
+# 仅运行前端测试
+npx vitest tests/frontend
+
+# 仅运行服务端测试
+npx vitest tests/server
+```
+
+### 📊 测试统计
+
+- **总测试用例数**: 70+ 个
+- **前端测试**: 46+ 个用例
+- **服务端测试**: 24+ 个用例
+- **测试环境**: 
+  - 前端测试使用 JSDOM 环境
+  - 服务端测试使用 Node 环境
 
 ## 🤝 贡献
 
