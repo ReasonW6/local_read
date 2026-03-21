@@ -1,0 +1,147 @@
+/* 自定义标题栏样式 - 仅在 Electron 环境下生效 */
+
+.titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+  user-select: none;
+  /* 亮色主题默认 - 书架页 */
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  color: #333;
+}
+
+/* 暗色模式 - 书架页 (body.dark-mode) */
+body.dark-mode .titlebar {
+  background: rgba(30, 30, 30, 0.9);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+  color: #ccc;
+}
+
+/* 亮色主题 - 阅读器页 */
+[data-theme="light"] .titlebar,
+html[data-theme="light"] .titlebar {
+  background: rgba(255, 255, 255, 0.85);
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+  color: #333;
+}
+
+/* 暗色主题 - 阅读器页 */
+[data-theme="dark"] .titlebar,
+html[data-theme="dark"] .titlebar {
+  background: rgba(30, 30, 30, 0.9);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+  color: #ccc;
+}
+
+.titlebar-drag {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 14px;
+  -webkit-app-region: drag;
+}
+
+.titlebar-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.titlebar-title {
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titlebar-controls {
+  display: flex;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-btn {
+  width: 46px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  font-size: 10px;
+  padding: 0;
+}
+
+.titlebar-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+body.dark-mode .titlebar-btn:hover,
+[data-theme="dark"] .titlebar-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.titlebar-btn:active {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+body.dark-mode .titlebar-btn:active,
+[data-theme="dark"] .titlebar-btn:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.titlebar-btn svg {
+  width: 10px;
+  height: 10px;
+  stroke-width: 1;
+}
+
+.titlebar-close-btn:hover {
+  background: #e81123 !important;
+  color: #fff;
+}
+
+.titlebar-close-btn:active {
+  background: #c50f1f !important;
+  color: #fff;
+}
+
+/* Electron 环境下推低页面内容 */
+body.electron-app {
+  padding-top: 36px;
+}
+
+/* 书架页：sticky header 需要 top: 36px */
+body.electron-app .qd-header {
+  top: 36px;
+}
+
+/* 阅读器页：进度条和容器调整 */
+body.electron-app .reading-progress {
+  top: 36px;
+}
+
+body.electron-app .reading-progress__text {
+  top: 42px;
+}
+
+body.electron-app .container {
+  height: calc(100vh - 36px);
+}

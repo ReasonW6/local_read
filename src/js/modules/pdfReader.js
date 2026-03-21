@@ -4,8 +4,7 @@ import { DOM } from '../core/config.js';
 import { loadProgress, saveProgress } from './fileManager.js';
 import { clearReader, renderTOC, updateActiveTOC, renderChapterNav } from './uiController.js';
 
-const PDFJS_CDN_VERSION = '3.11.174';
-const PDFJS_BASE = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_CDN_VERSION}`;
+const PDFJS_BASE = '/src/vendor';
 let pdfScrollSyncBound = false;
 let activePdfObserver = null;
 
