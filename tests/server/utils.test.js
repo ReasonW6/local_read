@@ -141,3 +141,22 @@ describe('utils.isAllowedExtension', () => {
         expect(utils.isAllowedExtension('book.Pdf')).toBe(true);
     });
 });
+
+/* ========== resolveFontPath ========== */
+
+describe('utils.resolveFontPath', () => {
+    it('应解析字体目录中的正常文件名', () => {
+        const result = utils.resolveFontPath('test-font.ttf');
+        expect(result).toContain('test-font.ttf');
+        expect(path.isAbsolute(result)).toBe(true);
+    });
+
+    it('应拒绝包含路径分隔符的字体路径', () => {
+        expect(() => utils.resolveFontPath('../fonts2/escape.ttf')).toThrow('Invalid font path');
+        expect(() => utils.resolveFontPath('nested/font.ttf')).toThrow('Invalid font path');
+    });
+
+    it('应拒绝不支持的字体扩展名', () => {
+        expect(() => utils.resolveFontPath('bad.txt')).toThrow('Invalid font file type');
+    });
+});

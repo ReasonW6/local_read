@@ -1,6 +1,7 @@
 // Bookmark management functionality
 import { state, updateState } from '../core/state.js';
 import { DOM, CONFIG } from '../core/config.js';
+import { getStoredBookmarkMap, getBookmarksForStorageKey, persistBookmarkMap } from './bookmarkStorage.js';
 
 // Get current reading location
 export function getCurrentReadingLocation() {
@@ -85,9 +86,9 @@ export function saveBookmark(bookmark) {
   bookmarks.push(bookmark);
 
   try {
-    const allBookmarks = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.BOOKMARKS) || '{}');
+    const allBookmarks = getStoredBookmarkMap();
     allBookmarks[state.currentFileKey] = bookmarks;
-    localStorage.setItem(CONFIG.STORAGE_KEYS.BOOKMARKS, JSON.stringify(allBookmarks));
+    persistBookmarkMap(allBookmarks);
   } catch (e) {
     console.warn('Failed to save bookmark:', e);
   }
@@ -98,8 +99,7 @@ export function getBookmarksForCurrentBook() {
   if (!state.currentFileKey) return [];
 
   try {
-    const allBookmarks = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.BOOKMARKS) || '{}');
-    return allBookmarks[state.currentFileKey] || [];
+    return getBookmarksForStorageKey(state.currentFileKey);
   } catch (e) {
     console.warn('Failed to load bookmarks:', e);
     return [];
@@ -202,11 +202,11 @@ export function removeBookmark(bookmarkId) {
   if (!confirm('确定要删除这个书签吗？')) return;
 
   try {
-    const allBookmarks = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.BOOKMARKS) || '{}');
+    const allBookmarks = getStoredBookmarkMap();
     const currentBookmarks = allBookmarks[state.currentFileKey] || [];
 
     allBookmarks[state.currentFileKey] = currentBookmarks.filter(b => b.id !== bookmarkId);
-    localStorage.setItem(CONFIG.STORAGE_KEYS.BOOKMARKS, JSON.stringify(allBookmarks));
+    persistBookmarkMap(allBookmarks);
 
     // 更新状态并重新渲染
     loadBookmarks();
@@ -229,9 +229,9 @@ export function clearAllBookmarks() {
   if (!confirm(`确定要清空当前书籍的所有 ${state.bookmarks.length} 个书签吗？此操作不可撤销。`)) return;
 
   try {
-    const allBookmarks = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.BOOKMARKS) || '{}');
+    const allBookmarks = getStoredBookmarkMap();
     allBookmarks[state.currentFileKey] = [];
-    localStorage.setItem(CONFIG.STORAGE_KEYS.BOOKMARKS, JSON.stringify(allBookmarks));
+    persistBookmarkMap(allBookmarks);
 
     // 更新状态并重新渲染
     loadBookmarks();

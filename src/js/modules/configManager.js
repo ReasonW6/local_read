@@ -7,6 +7,12 @@ import {
   formatDecimal,
   applyProgressBarPreference
 } from '../core/utils.js';
+import {
+  getStoredBookmarkMap,
+  getBookmarksForStorageKey,
+  normalizeImportedBookmarkMap,
+  persistBookmarkMap
+} from './bookmarkStorage.js';
 
 // 配置管理器
 export class ConfigManager {
@@ -88,23 +94,17 @@ export class ConfigManager {
 
   // 获取所有书签
   getAllBookmarks() {
-    const allBookmarks = {};
+    const storedBookmarks = getStoredBookmarkMap();
+    const exportedBookmarks = {};
 
-    // 遍历localStorage中所有以'bookmarks_'开头的键
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('bookmarks_')) {
-        try {
-          const bookmarks = JSON.parse(localStorage.getItem(key));
-          const bookPath = key.replace('bookmarks_', '');
-          allBookmarks[bookPath] = bookmarks;
-        } catch (e) {
-          console.warn(`Failed to parse bookmarks for ${key}:`, e);
-        }
-      }
-    }
+    Object.entries(storedBookmarks).forEach(([storageKey, bookmarks]) => {
+      const bookPath = storageKey.startsWith('server_reader_')
+        ? storageKey.slice('server_reader_'.length)
+        : storageKey;
+      exportedBookmarks[bookPath] = bookmarks;
+    });
 
-    return allBookmarks;
+    return exportedBookmarks;
   }
 
   // 保存配置到服务器
@@ -213,10 +213,7 @@ export class ConfigManager {
 
       // 应用书签
       if (config.bookmarks) {
-        Object.entries(config.bookmarks).forEach(([bookPath, bookmarks]) => {
-          const key = 'bookmarks_' + bookPath;
-          localStorage.setItem(key, JSON.stringify(bookmarks));
-        });
+        persistBookmarkMap(normalizeImportedBookmarkMap(config.bookmarks));
       }
 
       // 如果当前有打开的书籍，重新加载书签
@@ -328,10 +325,7 @@ export class ConfigManager {
     if (!state.currentFileKey) return [];
 
     try {
-      const bookPath = state.currentFileKey.replace('server_reader_', '');
-      const key = 'bookmarks_' + bookPath;
-      const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : [];
+      return getBookmarksForStorageKey(state.currentFileKey);
     } catch (e) {
       console.warn('Failed to load bookmarks:', e);
       return [];

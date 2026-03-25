@@ -174,17 +174,21 @@ function loadCompleteReadingState() {
 
 /* ========== 保存功能 ========== */
 
+function persistCurrentReadingSession() {
+  if (state.type === 'epub') {
+    manualSaveEpubProgress();
+  } else if (state.type === 'txt') {
+    manualSaveTxtProgress();
+  } else if (state.type === 'pdf') {
+    manualSavePdfProgress();
+  }
+
+  saveCompleteReadingState();
+}
+
 async function saveAllData() {
   try {
-    if (state.type === 'epub') {
-      manualSaveEpubProgress();
-    } else if (state.type === 'txt') {
-      manualSaveTxtProgress();
-    } else if (state.type === 'pdf') {
-      manualSavePdfProgress();
-    }
-    
-    saveCompleteReadingState();
+    persistCurrentReadingSession();
     
     const config = configManager.collectAllData();
     const response = await fetch('/api/save-config', {
@@ -555,14 +559,7 @@ function initKeyboardShortcuts() {
 }
 
 function manualSaveProgress() {
-  if (state.type === 'epub') {
-    manualSaveEpubProgress();
-  } else if (state.type === 'txt') {
-    manualSaveTxtProgress();
-  } else if (state.type === 'pdf') {
-    manualSavePdfProgress();
-  }
-  saveCompleteReadingState();
+  persistCurrentReadingSession();
   showSavedIndicator();
 }
 
@@ -957,6 +954,8 @@ function setupEventListeners() {
   
   window.addEventListener('beforeunload', () => {
     if (state.currentFileKey && state.bookshelf.length > 0) {
+      persistCurrentReadingSession();
+
       const currentBook = state.bookshelf.find(book => getFileKey(book.path) === state.currentFileKey);
       if (currentBook) {
         saveLastReadBook(currentBook);

@@ -194,6 +194,35 @@ describe('GET /api/fonts — 字体列表', () => {
     });
 });
 
+describe('字体文件接口安全性', () => {
+    let siblingFontsDir, siblingFontPath;
+
+    beforeAll(() => {
+        siblingFontsDir = path.join(path.dirname(DIRS.fonts), 'fonts2');
+        siblingFontPath = path.join(siblingFontsDir, 'escape.ttf');
+        if (!fs.existsSync(siblingFontsDir)) {
+            fs.mkdirSync(siblingFontsDir, { recursive: true });
+        }
+        fs.writeFileSync(siblingFontPath, 'fake-font');
+    });
+
+    afterAll(() => {
+        if (fs.existsSync(siblingFontPath)) fs.unlinkSync(siblingFontPath);
+        if (fs.existsSync(siblingFontsDir)) fs.rmSync(siblingFontsDir, { recursive: true, force: true });
+    });
+
+    it('GET /api/fonts/file/:fontId 应拒绝目录穿越', async () => {
+        const res = await request.get('/api/fonts/file/..%2Ffonts2%2Fescape.ttf');
+        expect(res.status).toBe(403);
+    });
+
+    it('DELETE /api/fonts/:fontId 应拒绝目录穿越', async () => {
+        const res = await request.delete('/api/fonts/..%2Ffonts2%2Fescape.ttf');
+        expect(res.status).toBe(403);
+        expect(fs.existsSync(siblingFontPath)).toBe(true);
+    });
+});
+
 /* ========== 封面功能测试 ========== */
 
 describe('GET /api/book-cover — 书籍封面', () => {

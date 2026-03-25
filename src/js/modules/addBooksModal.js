@@ -162,31 +162,70 @@ function updateFilesDisplay() {
   const els = getElements();
   if (!els.filesList) return;
 
+  const createEmptyState = () => {
+    const empty = document.createElement('div');
+    empty.className = 'files-empty';
+    const text = document.createElement('p');
+    text.textContent = '还没有选择任何文件';
+    empty.appendChild(text);
+    return empty;
+  };
+
   if (modalState.files.length === 0) {
-    els.filesList.innerHTML = `<div class="files-empty"><p>还没有选择任何文件</p></div>`;
+    els.filesList.innerHTML = '';
+    els.filesList.appendChild(createEmptyState());
     return;
   }
 
-  els.filesList.innerHTML = modalState.files.map((file, index) => {
+  els.filesList.innerHTML = '';
+  const fragment = document.createDocumentFragment();
+
+  modalState.files.forEach((file, index) => {
     const ext = getFileExtension(file.name);
     const size = formatFileSize(file.size);
-    
-    return `
-      <div class="file-item">
-        <div class="file-icon ${ext}">${ext}</div>
-        <div class="file-info">
-          <p class="file-name" title="${file.name}">${file.name}</p>
-          <p class="file-size">${size}</p>
-        </div>
-        <button class="file-remove" data-index="${index}" title="移除">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
+    const safeExtClass = /^[a-z0-9_-]+$/i.test(ext) ? ext : 'file';
+
+    const item = document.createElement('div');
+    item.className = 'file-item';
+
+    const icon = document.createElement('div');
+    icon.className = 'file-icon';
+    icon.classList.add(safeExtClass);
+    icon.textContent = ext;
+
+    const info = document.createElement('div');
+    info.className = 'file-info';
+
+    const name = document.createElement('p');
+    name.className = 'file-name';
+    name.title = file.name;
+    name.textContent = file.name;
+
+    const sizeText = document.createElement('p');
+    sizeText.className = 'file-size';
+    sizeText.textContent = size;
+
+    info.appendChild(name);
+    info.appendChild(sizeText);
+
+    const button = document.createElement('button');
+    button.className = 'file-remove';
+    button.dataset.index = String(index);
+    button.title = '移除';
+    button.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
     `;
-  }).join('');
+
+    item.appendChild(icon);
+    item.appendChild(info);
+    item.appendChild(button);
+    fragment.appendChild(item);
+  });
+
+  els.filesList.appendChild(fragment);
   
   // 绑定移除按钮事件
   els.filesList.querySelectorAll('.file-remove').forEach(btn => {

@@ -36,6 +36,11 @@ function createApp(dirs) {
   const DIRS = dirs;
   const app = express();
 
+  const isPathInside = (rootDir, targetPath) => {
+    const relative = path.relative(path.resolve(rootDir), path.resolve(targetPath));
+    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  };
+
   // 封面缓存（限制大小，避免大书库占用过多内存）
   const coverCache = new Map();
   const COVER_CACHE_LIMIT = 200;
@@ -107,6 +112,25 @@ function createApp(dirs) {
     isAllowedExtension: (filename) => {
       const ext = path.extname(filename).toLowerCase();
       return ALLOWED_EXTENSIONS.includes(ext);
+    },
+
+    resolveFontPath: (fontId = '') => {
+      const normalized = path.normalize(String(fontId || ''));
+      if (!normalized || path.basename(normalized) !== normalized) {
+        throw new Error('Invalid font path');
+      }
+
+      const resolved = path.resolve(DIRS.fonts, normalized);
+      if (!isPathInside(DIRS.fonts, resolved)) {
+        throw new Error('Invalid font path');
+      }
+
+      const ext = path.extname(resolved).toLowerCase();
+      if (!ALLOWED_FONT_EXTENSIONS.includes(ext)) {
+        throw new Error('Invalid font file type');
+      }
+
+      return resolved;
     }
   };
 
@@ -560,19 +584,18 @@ function createApp(dirs) {
   // 获取字体文件
   app.get('/api/fonts/file/:fontId', (req, res) => {
     try {
-      const fontId = req.params.fontId;
-      const fontPath = path.join(DIRS.fonts, fontId);
-
-      const resolved = path.resolve(fontPath);
-      if (!resolved.startsWith(path.resolve(DIRS.fonts))) {
+      let resolved;
+      try {
+        resolved = utils.resolveFontPath(req.params.fontId);
+      } catch {
         return res.status(403).json({ error: '无效的字体路径' });
       }
 
-      if (!fs.existsSync(fontPath)) {
+      if (!fs.existsSync(resolved)) {
         return res.status(404).json({ error: '字体不存在' });
       }
 
-      const ext = path.extname(fontId).toLowerCase();
+      const ext = path.extname(resolved).toLowerCase();
       const mimeType = FONT_MIME_TYPES[ext] || 'application/octet-stream';
 
       res.set({
@@ -590,19 +613,18 @@ function createApp(dirs) {
   // 删除字体
   app.delete('/api/fonts/:fontId', (req, res) => {
     try {
-      const fontId = req.params.fontId;
-      const fontPath = path.join(DIRS.fonts, fontId);
-
-      const resolved = path.resolve(fontPath);
-      if (!resolved.startsWith(path.resolve(DIRS.fonts))) {
+      let resolved;
+      try {
+        resolved = utils.resolveFontPath(req.params.fontId);
+      } catch {
         return res.status(403).json({ error: '无效的字体路径' });
       }
 
-      if (!fs.existsSync(fontPath)) {
+      if (!fs.existsSync(resolved)) {
         return res.status(404).json({ error: '字体不存在' });
       }
 
-      fs.unlinkSync(fontPath);
+      fs.unlinkSync(resolved);
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting font:', error);
