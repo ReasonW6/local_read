@@ -48,7 +48,8 @@
   </div>
   <script>
     if (window.electronAPI && window.electronAPI.isElectron) {
-      document.body.classList.add('electron-app');
+      document.documentElement.classList.add('electron-app', 'reader-page');
+      document.body.classList.add('electron-app', 'reader-page');
       var tb = document.getElementById('titlebar');
       tb.style.display = '';
       document.getElementById('titlebar-min').onclick = function() { window.electronAPI.windowMinimize(); };

@@ -1,6 +1,7 @@
 import { CONFIG } from './core/config.js';
 import { formatTimeAgo } from './core/utils.js';
 import { initAddBooksModal, openAddBooksModal } from './modules/addBooksModal.js';
+import { initElectronScrollbarState } from './modules/electronScrollbar.js';
 
 const state = {
   books: [],
@@ -78,8 +79,10 @@ function applyTheme(theme) {
 
   if (theme === 'dark') {
     document.body.classList.add('dark-mode');
+    document.documentElement.classList.add('dark-mode');
   } else {
     document.body.classList.remove('dark-mode');
+    document.documentElement.classList.remove('dark-mode');
   }
 
   if (els.themeToggle) {
@@ -344,6 +347,7 @@ function setupEventListeners() {
 }
 
 async function init() {
+  initElectronScrollbarState();
   loadLocalHistory();
   const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'light';
   applyTheme(savedTheme);
