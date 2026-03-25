@@ -21,12 +21,48 @@
   <link rel="stylesheet" href="src/css/base.css">
   <link rel="stylesheet" href="src/css/components.css">
   <link rel="stylesheet" href="src/css/responsive.css">
-  
-  <!-- External Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://unpkg.com/epubjs/dist/epub.min.js"></script>
+  <link rel="stylesheet" href="src/css/titlebar.css">
+
+  <!-- Libraries (本地化) -->
+  <script src="src/vendor/jszip.min.js"></script>
+  <script src="src/vendor/epub.min.js"></script>
 </head>
 <body data-theme="light">
+  <!-- 自定义标题栏（Electron 环境下显示） -->
+  <div id="titlebar" class="titlebar" style="display:none">
+    <div class="titlebar-drag">
+      <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+      <span class="titlebar-title">本地阅读</span>
+    </div>
+    <div class="titlebar-controls">
+      <button id="titlebar-min" class="titlebar-btn" title="最小化">
+        <svg viewBox="0 0 10 10"><line x1="1" y1="5" x2="9" y2="5" stroke="currentColor"/></svg>
+      </button>
+      <button id="titlebar-max" class="titlebar-btn" title="最大化">
+        <svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" stroke="currentColor" fill="none"/></svg>
+      </button>
+      <button id="titlebar-close" class="titlebar-btn titlebar-close-btn" title="关闭">
+        <svg viewBox="0 0 10 10"><line x1="1" y1="1" x2="9" y2="9" stroke="currentColor"/><line x1="9" y1="1" x2="1" y2="9" stroke="currentColor"/></svg>
+      </button>
+    </div>
+  </div>
+  <script>
+    if (window.electronAPI && window.electronAPI.isElectron) {
+      document.body.classList.add('electron-app');
+      var tb = document.getElementById('titlebar');
+      tb.style.display = '';
+      document.getElementById('titlebar-min').onclick = function() { window.electronAPI.windowMinimize(); };
+      document.getElementById('titlebar-max').onclick = function() { window.electronAPI.windowMaximize(); };
+      document.getElementById('titlebar-close').onclick = function() { window.electronAPI.windowClose(); };
+      window.electronAPI.onMaximizeChange(function(isMax) {
+        var btn = document.getElementById('titlebar-max');
+        btn.title = isMax ? '还原' : '最大化';
+        btn.innerHTML = isMax
+          ? '<svg viewBox="0 0 10 10"><rect x="2.5" y="0" width="7" height="7" stroke="currentColor" fill="none"/><rect x="0" y="2.5" width="7" height="7" stroke="currentColor" fill="var(--toolbar-bg, #fff)"/></svg>'
+          : '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" stroke="currentColor" fill="none"/></svg>';
+      });
+    }
+  </script>
   <div class="reading-progress"><div class="reading-progress__bar" id="readingProgressBar"></div></div>
   <div class="reading-progress__text" id="readingProgressText">0%</div>
 

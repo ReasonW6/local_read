@@ -14,9 +14,45 @@
   </style>
   <link rel="stylesheet" href="src/css/qidian.css">
   <link rel="stylesheet" href="src/css/components.css">
+  <link rel="stylesheet" href="src/css/titlebar.css">
 </head>
 
 <body>
+  <!-- 自定义标题栏（Electron 环境下显示） -->
+  <div id="titlebar" class="titlebar" style="display:none">
+    <div class="titlebar-drag">
+      <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+      <span class="titlebar-title">本地阅读</span>
+    </div>
+    <div class="titlebar-controls">
+      <button id="titlebar-min" class="titlebar-btn" title="最小化">
+        <svg viewBox="0 0 10 10"><line x1="1" y1="5" x2="9" y2="5" stroke="currentColor"/></svg>
+      </button>
+      <button id="titlebar-max" class="titlebar-btn" title="最大化">
+        <svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" stroke="currentColor" fill="none"/></svg>
+      </button>
+      <button id="titlebar-close" class="titlebar-btn titlebar-close-btn" title="关闭">
+        <svg viewBox="0 0 10 10"><line x1="1" y1="1" x2="9" y2="9" stroke="currentColor"/><line x1="9" y1="1" x2="1" y2="9" stroke="currentColor"/></svg>
+      </button>
+    </div>
+  </div>
+  <script>
+    if (window.electronAPI && window.electronAPI.isElectron) {
+      document.body.classList.add('electron-app');
+      const tb = document.getElementById('titlebar');
+      tb.style.display = '';
+      document.getElementById('titlebar-min').onclick = () => window.electronAPI.windowMinimize();
+      document.getElementById('titlebar-max').onclick = () => window.electronAPI.windowMaximize();
+      document.getElementById('titlebar-close').onclick = () => window.electronAPI.windowClose();
+      window.electronAPI.onMaximizeChange(isMax => {
+        const btn = document.getElementById('titlebar-max');
+        btn.title = isMax ? '还原' : '最大化';
+        btn.innerHTML = isMax
+          ? '<svg viewBox="0 0 10 10"><rect x="2.5" y="0" width="7" height="7" stroke="currentColor" fill="none"/><rect x="0" y="2.5" width="7" height="7" stroke="currentColor" fill="var(--qd-white, #fff)"/></svg>'
+          : '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" stroke="currentColor" fill="none"/></svg>';
+      });
+    }
+  </script>
   <header class="qd-header">
     <div class="qd-header-inner">
       <a href="#" class="qd-logo">

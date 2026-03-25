@@ -1,12 +1,19 @@
 // Configuration management module
 import { state, updateState } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
-import { 
-  normalizePrefs, 
-  computeVerticalPadding, 
-  formatDecimal, 
-  applyProgressBarPreference 
+import {
+  normalizePrefs,
+  computeVerticalPadding,
+  formatDecimal,
+  applyProgressBarPreference
 } from '../core/utils.js';
+import {
+  getStoredBookmarkMap,
+  getBookmarksForStorageKey,
+  normalizeImportedBookmarkMap,
+  persistBookmarkMap
+} from './bookmarkStorage.js';
+import { renderBookmarkList } from './bookmarkManager.js';
 
 // 配置管理器
 export class ConfigManager {
@@ -22,25 +29,25 @@ export class ConfigManager {
         theme: state.theme,
         fontSize: state.fontSize,
       },
-      
+
       // 阅读偏好
       readingPrefs: this.getReadingPrefs(),
-      
+
       // 最后阅读的书籍
       lastReadBook: state.lastReadBook,
-      
+
       // 阅读历史记录
       readingHistory: state.readingHistory || {},
-      
+
       // 当前正在阅读的书籍
       currentlyReading: state.currentlyReading,
-      
+
       // 所有书籍的阅读进度
       readingProgress: this.getAllReadingProgress(),
-      
+
       // 所有书签
       bookmarks: this.getAllBookmarks(),
-      
+
       // 元数据
       metadata: {
         exportedAt: new Date().toISOString(),
@@ -50,7 +57,7 @@ export class ConfigManager {
         description: '本地电子书阅读器完整配置文件'
       }
     };
-    
+
     return allData;
   }
 
@@ -68,7 +75,7 @@ export class ConfigManager {
   // 获取所有阅读进度
   getAllReadingProgress() {
     const progress = {};
-    
+
     // 遍历localStorage中所有以'server_reader_'开头的键
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -82,36 +89,30 @@ export class ConfigManager {
         }
       }
     }
-    
+
     return progress;
   }
 
   // 获取所有书签
   getAllBookmarks() {
-    const allBookmarks = {};
-    
-    // 遍历localStorage中所有以'bookmarks_'开头的键
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('bookmarks_')) {
-        try {
-          const bookmarks = JSON.parse(localStorage.getItem(key));
-          const bookPath = key.replace('bookmarks_', '');
-          allBookmarks[bookPath] = bookmarks;
-        } catch (e) {
-          console.warn(`Failed to parse bookmarks for ${key}:`, e);
-        }
-      }
-    }
-    
-    return allBookmarks;
+    const storedBookmarks = getStoredBookmarkMap();
+    const exportedBookmarks = {};
+
+    Object.entries(storedBookmarks).forEach(([storageKey, bookmarks]) => {
+      const bookPath = storageKey.startsWith('server_reader_')
+        ? storageKey.slice('server_reader_'.length)
+        : storageKey;
+      exportedBookmarks[bookPath] = bookmarks;
+    });
+
+    return exportedBookmarks;
   }
 
   // 保存配置到服务器
   async saveConfig(customName = null) {
     try {
       const config = this.collectAllData();
-      
+
       const response = await fetch('/api/save-config', {
         method: 'POST',
         headers: {
@@ -122,17 +123,17 @@ export class ConfigManager {
           filename: customName
         })
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to save config');
       }
-      
+
       const result = await response.json();
       this.currentConfigName = result.filename;
-      
+
       // 显示成功消息
       this.showMessage('配置保存成功！文件名: ' + result.filename, 'success');
-      
+
       return result;
     } catch (error) {
       console.error('Error saving config:', error);
@@ -145,17 +146,17 @@ export class ConfigManager {
   async loadConfig(filename) {
     try {
       const response = await fetch(`/api/load-config/${filename}`);
-      
+
       if (!response.ok) {
         throw new Error('Failed to load config');
       }
-      
+
       const result = await response.json();
       await this.applyConfig(result.config);
-      
+
       this.currentConfigName = filename;
       this.showMessage('配置加载成功！', 'success');
-      
+
       return result.config;
     } catch (error) {
       console.error('Error loading config:', error);
@@ -174,7 +175,7 @@ export class ConfigManager {
           document.body.setAttribute('data-theme', config.settings.theme);
           this.updateThemeUI();
         }
-        
+
         if (config.settings.fontSize && config.settings.fontSize !== state.fontSize) {
           updateState({ fontSize: config.settings.fontSize });
           this.updateFontSizeUI();
@@ -213,17 +214,14 @@ export class ConfigManager {
 
       // 应用书签
       if (config.bookmarks) {
-        Object.entries(config.bookmarks).forEach(([bookPath, bookmarks]) => {
-          const key = 'bookmarks_' + bookPath;
-          localStorage.setItem(key, JSON.stringify(bookmarks));
-        });
+        persistBookmarkMap(normalizeImportedBookmarkMap(config.bookmarks));
       }
 
       // 如果当前有打开的书籍，重新加载书签
       if (state.currentFileKey) {
         const bookmarks = this.loadBookmarksForCurrentBook();
         updateState({ bookmarks });
-        this.renderBookmarks();
+        renderBookmarkList();
       }
 
       // 重新渲染书架以显示更新的阅读历史
@@ -245,7 +243,7 @@ export class ConfigManager {
   applyReadingPrefs(prefs) {
     const normalized = normalizePrefs(prefs);
     const verticalPadding = computeVerticalPadding(normalized.pagePadding);
-    
+
     document.documentElement.style.setProperty('--para-spacing', String(normalized.paraSpacing));
     document.documentElement.style.setProperty('--letter-spacing', `${normalized.letterSpacing}px`);
     document.documentElement.style.setProperty('--line-height', String(normalized.lineHeight));
@@ -261,7 +259,7 @@ export class ConfigManager {
       pageWidth: document.getElementById('pageWidthInput'),
       pagePadding: document.getElementById('pageMarginInput')
     };
-    
+
     const values = {
       paraSpacing: document.getElementById('paraSpacingVal'),
       letterSpacing: document.getElementById('letterSpacingVal'),
@@ -308,7 +306,7 @@ export class ConfigManager {
         span.textContent = state.theme === 'dark' ? '日间' : '夜间';
       }
     }
-    
+
     const currentTheme = document.getElementById('currentTheme');
     if (currentTheme) {
       currentTheme.textContent = state.theme === 'dark' ? '夜间模式' : '日间模式';
@@ -326,56 +324,12 @@ export class ConfigManager {
   // 加载当前书籍的书签
   loadBookmarksForCurrentBook() {
     if (!state.currentFileKey) return [];
-    
+
     try {
-      const bookPath = state.currentFileKey.replace('server_reader_', '');
-      const key = 'bookmarks_' + bookPath;
-      const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : [];
+      return getBookmarksForStorageKey(state.currentFileKey);
     } catch (e) {
       console.warn('Failed to load bookmarks:', e);
       return [];
-    }
-  }
-
-  // 渲染书签
-  renderBookmarks() {
-    const bookmarkList = document.getElementById('bookmarkList');
-    if (!bookmarkList) return;
-    
-    bookmarkList.innerHTML = '';
-    
-    if (state.bookmarks.length === 0) {
-      bookmarkList.innerHTML = '<div class="muted" style="padding: 10px;">暂无书签</div>';
-      return;
-    }
-    
-    state.bookmarks.forEach((bookmark, index) => {
-      const el = document.createElement('div');
-      el.className = 'chapter-item';
-      el.innerHTML = `
-        <div style="flex:1">
-          <div style="font-weight:600">${bookmark.title || '书签 ' + (index + 1)}</div>
-          <div class="muted" style="font-size:12px">${new Date(bookmark.timestamp).toLocaleString()}</div>
-        </div>
-        <button onclick="removeBookmark(${index})" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;" title="删除书签">×</button>
-      `;
-      el.onclick = (e) => {
-        if (e.target.tagName !== 'BUTTON') {
-          this.goToBookmark(bookmark);
-        }
-      };
-      bookmarkList.appendChild(el);
-    });
-  }
-
-  // 跳转到书签
-  goToBookmark(bookmark) {
-    if (state.type === 'epub' && state.rendition) {
-      state.rendition.display(bookmark.cfi);
-    } else if (state.type === 'txt' && typeof bookmark.pageIndex === 'number') {
-      state.currentIndex = bookmark.pageIndex;
-      this.renderTxtPage();
     }
   }
 
@@ -383,11 +337,11 @@ export class ConfigManager {
   async getConfigList() {
     try {
       const response = await fetch('/api/config-list');
-      
+
       if (!response.ok) {
         throw new Error('Failed to get config list');
       }
-      
+
       const result = await response.json();
       return result.configs;
     } catch (error) {
@@ -402,11 +356,11 @@ export class ConfigManager {
       const response = await fetch(`/api/config/${filename}`, {
         method: 'DELETE'
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to delete config');
       }
-      
+
       const result = await response.json();
       this.showMessage('配置文件删除成功！', 'success');
       return result;
@@ -420,7 +374,8 @@ export class ConfigManager {
   // 下载配置文件
   downloadConfig(filename) {
     const link = document.createElement('a');
-    link.href = `/api/download-config/${filename}`;
+    // BUG-10: 编码文件名防止特殊字符破坏 URL
+    link.href = `/api/download-config/${encodeURIComponent(filename)}`;
     link.download = filename;
     document.body.appendChild(link);
     link.click();
@@ -448,9 +403,9 @@ export class ConfigManager {
       ${type === 'error' ? 'background: #f44336;' : ''}
       ${type === 'info' ? 'background: #2196F3;' : ''}
     `;
-    
+
     document.body.appendChild(messageEl);
-    
+
     // 3秒后自动移除
     setTimeout(() => {
       if (document.body.contains(messageEl)) {
