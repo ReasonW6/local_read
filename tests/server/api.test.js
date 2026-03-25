@@ -102,6 +102,22 @@ describe('GET /api/book — 读取书籍内容', () => {
             .get('/api/book?path=nonexistent-book-12345.epub');
         expect(res.status).toBe(404);
     });
+
+    it('应拒绝同前缀兄弟目录的绝对路径', async () => {
+        const siblingDir = path.join(path.dirname(DIRS.books), 'books2');
+        const siblingFile = path.join(siblingDir, 'escape.txt');
+        fs.mkdirSync(siblingDir, { recursive: true });
+        fs.writeFileSync(siblingFile, 'escape');
+
+        try {
+            const res = await request
+                .get(`/api/book?path=${encodeURIComponent(siblingFile.replace(/\\/g, '/'))}`);
+            expect(res.status).toBe(403);
+        } finally {
+            if (fs.existsSync(siblingFile)) fs.unlinkSync(siblingFile);
+            if (fs.existsSync(siblingDir)) fs.rmSync(siblingDir, { recursive: true, force: true });
+        }
+    });
 });
 
 /* ========== 配置管理功能测试 ========== */
@@ -146,6 +162,21 @@ describe('配置管理 — 保存/加载/列表/删除', () => {
     it('GET /api/load-config/:filename — 应返回 404 对不存在的配置', async () => {
         const res = await request.get('/api/load-config/nonexistent-config.json');
         expect(res.status).toBe(404);
+    });
+
+    it('GET /api/load-config/:filename — 应拒绝同前缀兄弟目录的绝对路径', async () => {
+        const siblingDir = path.join(path.dirname(DIRS.config), 'user-data2');
+        const siblingFile = path.join(siblingDir, 'escape.json');
+        fs.mkdirSync(siblingDir, { recursive: true });
+        fs.writeFileSync(siblingFile, JSON.stringify({ ok: true }));
+
+        try {
+            const res = await request.get(`/api/load-config/${encodeURIComponent(siblingFile.replace(/\\/g, '/'))}`);
+            expect(res.status).toBe(400);
+        } finally {
+            if (fs.existsSync(siblingFile)) fs.unlinkSync(siblingFile);
+            if (fs.existsSync(siblingDir)) fs.rmSync(siblingDir, { recursive: true, force: true });
+        }
     });
 
     it('DELETE /api/config/:filename — 应删除配置文件', async () => {

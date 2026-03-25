@@ -13,6 +13,7 @@ import {
   normalizeImportedBookmarkMap,
   persistBookmarkMap
 } from './bookmarkStorage.js';
+import { renderBookmarkList } from './bookmarkManager.js';
 
 // 配置管理器
 export class ConfigManager {
@@ -220,7 +221,7 @@ export class ConfigManager {
       if (state.currentFileKey) {
         const bookmarks = this.loadBookmarksForCurrentBook();
         updateState({ bookmarks });
-        this.renderBookmarks();
+        renderBookmarkList();
       }
 
       // 重新渲染书架以显示更新的阅读历史
@@ -329,47 +330,6 @@ export class ConfigManager {
     } catch (e) {
       console.warn('Failed to load bookmarks:', e);
       return [];
-    }
-  }
-
-  // 渲染书签
-  renderBookmarks() {
-    const bookmarkList = document.getElementById('bookmarkList');
-    if (!bookmarkList) return;
-
-    bookmarkList.innerHTML = '';
-
-    if (state.bookmarks.length === 0) {
-      bookmarkList.innerHTML = '<div class="muted" style="padding: 10px;">暂无书签</div>';
-      return;
-    }
-
-    state.bookmarks.forEach((bookmark, index) => {
-      const el = document.createElement('div');
-      el.className = 'chapter-item';
-      el.innerHTML = `
-        <div style="flex:1">
-          <div style="font-weight:600">${bookmark.title || '书签 ' + (index + 1)}</div>
-          <div class="muted" style="font-size:12px">${new Date(bookmark.timestamp).toLocaleString()}</div>
-        </div>
-        <button onclick="removeBookmark(${index})" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;" title="删除书签">×</button>
-      `;
-      el.onclick = (e) => {
-        if (e.target.tagName !== 'BUTTON') {
-          this.goToBookmark(bookmark);
-        }
-      };
-      bookmarkList.appendChild(el);
-    });
-  }
-
-  // 跳转到书签
-  goToBookmark(bookmark) {
-    if (state.type === 'epub' && state.rendition) {
-      state.rendition.display(bookmark.cfi);
-    } else if (state.type === 'txt' && typeof bookmark.pageIndex === 'number') {
-      state.currentIndex = bookmark.pageIndex;
-      this.renderTxtPage();
     }
   }
 

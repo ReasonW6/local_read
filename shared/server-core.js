@@ -70,8 +70,7 @@ function createApp(dirs) {
     resolveBookPath: (relativePath = '') => {
       const normalized = path.normalize(relativePath).replace(/^([\.\\/])+/, '');
       const resolved = path.resolve(DIRS.books, normalized);
-      const booksRoot = path.resolve(DIRS.books);
-      if (!resolved.toLowerCase().startsWith(booksRoot.toLowerCase())) {
+      if (!isPathInside(DIRS.books, resolved)) {
         throw new Error('Invalid book path');
       }
       return resolved;
@@ -80,8 +79,7 @@ function createApp(dirs) {
     resolveConfigPath: (filename = '') => {
       const normalized = path.normalize(filename).replace(/^([\.\\/])+/, '');
       const resolved = path.resolve(DIRS.config, normalized);
-      const configRoot = path.resolve(DIRS.config);
-      if (!resolved.toLowerCase().startsWith(configRoot.toLowerCase())) {
+      if (!isPathInside(DIRS.config, resolved)) {
         throw new Error('Invalid config path');
       }
       if (path.extname(resolved).toLowerCase() !== '.json') {
@@ -93,7 +91,7 @@ function createApp(dirs) {
     cleanupEmptyFolders: (startPath) => {
       let current = path.dirname(startPath);
       const booksRoot = path.resolve(DIRS.books);
-      while (current.toLowerCase().startsWith(booksRoot.toLowerCase()) && current !== booksRoot) {
+      while (isPathInside(booksRoot, current) && current !== booksRoot) {
         try {
           if (fs.readdirSync(current).length === 0) {
             fs.rmdirSync(current);

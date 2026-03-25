@@ -66,6 +66,11 @@ describe('utils.resolveBookPath', () => {
         const result = utils.resolveBookPath('');
         expect(path.isAbsolute(result)).toBe(true);
     });
+
+    it('应拒绝同前缀兄弟目录的绝对路径', () => {
+        const siblingPath = path.join(path.dirname(DIRS.books), 'books2', 'escape.epub');
+        expect(() => utils.resolveBookPath(siblingPath)).toThrow('Invalid book path');
+    });
 });
 
 /* ========== resolveConfigPath ========== */
@@ -94,6 +99,11 @@ describe('utils.resolveConfigPath', () => {
         const result = utils.resolveConfigPath('../../etc/config.json');
         const configRoot = path.resolve(DIRS.config);
         expect(result.toLowerCase().startsWith(configRoot.toLowerCase())).toBe(true);
+    });
+
+    it('应拒绝同前缀兄弟目录的绝对配置路径', () => {
+        const siblingPath = path.join(path.dirname(DIRS.config), 'user-data2', 'escape.json');
+        expect(() => utils.resolveConfigPath(siblingPath)).toThrow('Invalid config path');
     });
 });
 
