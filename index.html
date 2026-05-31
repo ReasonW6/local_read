@@ -38,7 +38,8 @@
   </div>
   <script>
     if (window.electronAPI && window.electronAPI.isElectron) {
-      document.body.classList.add('electron-app');
+      document.documentElement.classList.add('electron-app', 'bookshelf-page');
+      document.body.classList.add('electron-app', 'bookshelf-page');
       const tb = document.getElementById('titlebar');
       tb.style.display = '';
       document.getElementById('titlebar-min').onclick = () => window.electronAPI.windowMinimize();

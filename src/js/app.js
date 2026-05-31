@@ -33,6 +33,7 @@ import {
   renderFontSelector,
   initFontUpload
 } from './modules/fontManager.js';
+import { initElectronScrollbarState } from './modules/electronScrollbar.js';
 
 // 导入新模块
 import { 
@@ -868,6 +869,8 @@ function hideUploadProgress() {
 /* ========== 事件监听器设置 ========== */
 
 function setupEventListeners() {
+  initElectronScrollbarState();
+
   document.addEventListener('DOMContentLoaded', async () => {
     await preloadGlobalSettings();
     

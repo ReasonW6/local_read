@@ -4,6 +4,8 @@
 [![License](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ReasonW6/local_read/pulls)
 
+语言: [中文](README.md) | [English](README.en.md)
+
 > 一个运行在本地的电子书阅读网页应用，同时提供 Electron 桌面版。通过内置服务器稳定访问你的本地书库，支持手动记录阅读进度。支持 EPUB、TXT、PDF 格式，具备完整的配置管理和数据持久化功能。
 
 [⚡快速开始](#-快速开始) | [📝使用说明](#-使用说明) | [🔧配置管理](#-配置管理)
@@ -32,15 +34,16 @@
 - 📖 **最近阅读提示**: 自动标记上次阅读的书籍
 - 🛡️ **隐私保护**: 完全本地运行，保护用户隐私
 - 📊 **阅读进度**: 实时显示阅读进度条
+- 🔤 **自定义字体**: 支持上传和切换 `.ttf`、`.otf`、`.woff`、`.woff2` 字体
 - 🎨 **灵活定制**: 极宽范围的排版参数调整（页宽400-2000px，边距10-150px等）
 - 🔄 **智能滚动**: 章节切换自动回到顶部，提供流畅阅读体验
 - 🌐 **跨平台**: 支持 Windows、macOS、Linux
 
 ## 🐛 已知问题
 
-- PDF目录导航精度有限
+- PDF目录导航精度有限，具体效果取决于 PDF 文件自身目录信息
 - 大型EPUB文件可能加载较慢
-- ⚠️ **排版设置需要刷新**: 调整排版设置（页宽、页边距、行距等）后，需要刷新页面（按F5或Ctrl+R）才能看到完整效果
+- 个别大型文件首次提取封面或渲染页面时可能需要等待
 
 ## 🚀 快速开始
 
@@ -71,14 +74,8 @@
     npm install
     ```
     
-    > **注意**: 项目现在使用了以下依赖包：
-    > - `express`: Web 服务器框架
-    > - `multer`: 文件上传处理中间件
-    > 
-     > 如果是首次设置或手动安装，也可以分别安装：
-     ```bash
-     npm install express multer
-     ```
+    > **注意**: 依赖已在 `package.json` 和 `package-lock.json` 中声明，直接执行 `npm install` 即可安装 Express、Multer、AdmZip、Electron、Vitest 等运行和开发依赖。
+
 3. **选择运行方式**
 
    **Web 服务器模式（浏览器）**
@@ -129,7 +126,8 @@
   - 行距调整（1.0-3.5）
   - 段落间距（0.2-4）
   - 字间距（0-5px）
-  - > ⚠️ **重要提示**: 调整排版设置后，请刷新页面（F5或Ctrl+R）查看完整效果
+  - 阅读进度条显示/隐藏
+  - 自定义字体上传与切换
 - **键盘快捷键**: 
   - `←/→`: 上一章/下一章
   - `+/-`: 增大/减小字体
@@ -188,11 +186,13 @@ Electron 打包版默认将 `books/` 与 `user-data/` 放在系统用户数据�
 ```
 local_read/
 ├── books/                                # 📚 存放电子书文件 (.epub, .txt, .pdf)，Electron 打包版位于数据目录
+├── shared/
+│   └── server-core.js                    # Express API 核心逻辑，供 Web/Electron 复用
 ├── src/                                  # 💻 前端源码
 │   ├── css/                              # 🎨 样式文件
 │   │   ├── base.css                            # 基础样式和CSS变量（包含EPUB图片保护样式）
-│   │   ├── bookshelf.css                       # 书架页面样式
 │   │   ├── components.css                      # 组件样式
+│   │   ├── qidian.css                          # 书架首页样式
 │   │   └── responsive.css                      # 响应式设计
 │   └── js/                               # 📜 JavaScript模块
 │       ├── app.js                        # 阅读器主应用逻辑
@@ -202,17 +202,24 @@ local_read/
 │       │   └── state.js                        # 应用状态管理
 │       └── modules/                      # 🧩 功能模块
 │           ├── bookmarkManager.js              # 书签管理
+│           ├── bookmarkStorage.js              # 书签存储兼容层
+│           ├── addBooksModal.js                # 添加书籍弹窗
 │           ├── configManager.js                # 配置管理（扩展的排版参数范围）
 │           ├── epubCore.js                     # EPUB核心功能（主题和图片样式处理）
 │           ├── epubReader.js                   # EPUB阅读器
+│           ├── electronScrollbar.js            # Electron 滚动条状态
 │           ├── fileManager.js                  # 文件管理
+│           ├── fontManager.js                  # 自定义字体管理
 │           ├── pdfReader.js                    # PDF阅读器
+│           ├── readingPrefs.js                 # 阅读排版偏好
 │           ├── themeManager.js                 # 主题管理
 │           ├── txtReader.js                    # TXT阅读器（章节导航优化）
 │           └── uiController.js                 # UI控制器
+├── tests/                                # 🧪 Vitest 测试
+│   ├── frontend/                         # 前端单元测试
+│   └── server/                           # 服务端单元与 API 测试
 ├── user-data/                            # 💾 用户数据目录（Electron 打包版位于数据目录）
 │   └── user-config.json                  # 用户配置文件 (自动生成)
-├── node_modules/                         # 📦 项目依赖 (npm自动生成)
 ├── .gitignore                            # 🙈 Git忽略规则
 ├── index.html                            # 📚 书架首页
 ├── reader.html                           # 📖 阅读器页面
@@ -228,11 +235,14 @@ local_read/
 ## 🛠️ 技术栈
 
 - **后端**: Node.js, Express.js
+- **桌面端**: Electron, electron-builder
 - **前端**: HTML5, CSS3, Vanilla JavaScript (ES6 Modules)
 - **核心库**: 
   - **ePub.js**: 用于解析和渲染 EPUB 文件
   - **PDF.js**: 用于解析和渲染 PDF 文件
   - **JSZip**: 用于处理压缩文件
+  - **AdmZip**: 用于服务端 EPUB 封面提取
+  - **Multer**: 用于书籍和字体上传
 - **测试框架**: Vitest, Supertest
 
 ## 🧪 测试用例
@@ -244,6 +254,9 @@ local_read/
 ```
 tests/
 ├── frontend/           # 前端单元测试
+│   ├── addBooksModal.test.js
+│   ├── bookmarkStorage.test.js
+│   ├── configManager.test.js
 │   ├── config.test.js      # 配置模块测试
 │   └── utils.test.js       # 工具函数测试
 └── server/             # 服务端测试
@@ -281,6 +294,11 @@ tests/
 - ✅ `debounce` - 防抖函数（2个测试用例）
 - ✅ `throttle` - 节流函数（3个测试用例）
 
+**其他前端测试**
+- ✅ `bookmarkStorage` - 书签数据迁移和兼容读取
+- ✅ `addBooksModal` - 添加书籍弹窗的文件列表渲染安全性
+- ✅ `configManager` - 配置导出时的书签键名兼容
+
 #### **服务端测试** (`tests/server/`)
 
 **API 集成测试** (`api.test.js`)
@@ -302,6 +320,7 @@ tests/
 - ✅ `normalizePath` - 路径标准化（4个测试用例）
 - ✅ `resolveBookPath` - 书籍路径解析（含安全性测试，5个测试用例）
 - ✅ `resolveConfigPath` - 配置文件路径解析（含安全性测试，5个测试用例）
+- ✅ `resolveFontPath` - 字体路径解析（含安全性测试）
 - ✅ `decodeFilename` - 文件名解码（2个测试用例）
 - ✅ `isAllowedExtension` - 文件扩展名验证（7个测试用例）
 
@@ -326,9 +345,10 @@ npx vitest tests/server
 
 ### 📊 测试统计
 
-- **总测试用例数**: 70+ 个
-- **前端测试**: 46+ 个用例
-- **服务端测试**: 24+ 个用例
+- **总测试用例数**: 106 个
+- **测试文件数**: 7 个
+- **前端测试**: 58 个用例
+- **服务端测试**: 48 个用例
 - **测试环境**: 
   - 前端测试使用 JSDOM 环境
   - 服务端测试使用 Node 环境
