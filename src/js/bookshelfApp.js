@@ -1,7 +1,9 @@
 import { CONFIG } from './core/config.js';
 import { formatTimeAgo } from './core/utils.js';
 import { initAddBooksModal, openAddBooksModal } from './modules/addBooksModal.js';
-import { initElectronScrollbarState } from './modules/electronScrollbar.js';
+import { initDesktopScrollbarState } from './modules/desktopScrollbar.js';
+import { apiClient } from './platform/apiClient.js';
+import { desktopBridge } from './platform/desktopBridge.js';
 
 const state = {
   books: [],
@@ -43,6 +45,7 @@ const els = {
   search: document.getElementById('bookSearchInput'),
   themeToggle: document.getElementById('themeToggle'),
   addBtn: document.getElementById('addBookBtn'),
+  openBooksFolderBtn: document.getElementById('openBooksFolderBtn'),
   fileInput: document.getElementById('bookFileInput'),
   toast: document.getElementById('toast'),
   template: document.getElementById('bookCardTemplate'),
@@ -119,9 +122,7 @@ function updateSummary() {
 }
 
 async function fetchBooks() {
-  const response = await fetch(CONFIG.SERVER_API.BOOKSHELF);
-  if (!response.ok) throw new Error('无法加载书架');
-  state.books = await response.json();
+  state.books = await apiClient.listBooks();
 }
 
 async function loadCover(book, card) {
@@ -154,30 +155,15 @@ async function loadCover(book, card) {
   }
 
   try {
-    const coverUrl = `${CONFIG.SERVER_API.BOOK_COVER}?path=${encodeURIComponent(book.path)}`;
-    const response = await fetch(coverUrl);
-    if (!response.ok) throw new Error('Cover request failed');
-
-    const contentType = response.headers.get('content-type') || '';
-    let finalSrc = '';
-
-    if (contentType.includes('application/json')) {
-      const data = await response.json();
-      if (!data || !data.cover) {
-        setCoverCache(book.path, null);
-        if (placeholder) {
-          placeholder.textContent = book.name[0];
-          placeholder.hidden = false;
-        }
-        if (img) img.hidden = true;
-        return;
+    const finalSrc = await apiClient.getBookCover(book.path);
+    if (!finalSrc) {
+      setCoverCache(book.path, null);
+      if (placeholder) {
+        placeholder.textContent = book.name[0];
+        placeholder.hidden = false;
       }
-      finalSrc = data.cover;
-    } else if (contentType.startsWith('image/')) {
-      const blob = await response.blob();
-      finalSrc = URL.createObjectURL(blob);
-    } else {
-      throw new Error('Unexpected cover response');
+      if (img) img.hidden = true;
+      return;
     }
 
     setCoverCache(book.path, finalSrc);
@@ -256,11 +242,7 @@ function renderBookshelf() {
 async function handleDeleteBook(book) {
   if (!confirm(`确认删除《${book.name}》?`)) return;
   try {
-    const response = await fetch(`${CONFIG.SERVER_API.BOOK}?path=${encodeURIComponent(book.path)}`, { method: 'DELETE' });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: '未知错误' }));
-      throw new Error(error.error || '删除失败');
-    }
+    await apiClient.deleteBook(book.path);
     showToast('删除成功', 'success');
     await refreshBooks();
   } catch (e) {
@@ -271,19 +253,13 @@ async function handleDeleteBook(book) {
 
 async function uploadBooks(files) {
   if (!files.length) return;
-  const formData = new FormData();
-  Array.from(files).forEach(f => formData.append('books', f));
 
   try {
-    const res = await fetch(CONFIG.SERVER_API.UPLOAD, { method: 'POST', body: formData });
-    if (res.ok) {
-      showToast('上传成功', 'success');
-      await refreshBooks();
-    } else {
-      throw new Error('Upload failed');
-    }
+    await apiClient.uploadBooks(files);
+    showToast('上传成功', 'success');
+    await refreshBooks();
   } catch (e) {
-    showToast('上传失败', 'error');
+    showToast('上传失败: ' + e.message, 'error');
   } finally {
     if (els.fileInput) els.fileInput.value = '';
   }
@@ -308,6 +284,17 @@ function setupEventListeners() {
 
   // 点击添加书籍按钮打开弹窗
   if (els.addBtn) els.addBtn.addEventListener('click', openAddBooksModal);
+
+  if (els.openBooksFolderBtn && desktopBridge.isDesktop) {
+    els.openBooksFolderBtn.hidden = false;
+    els.openBooksFolderBtn.addEventListener('click', async () => {
+      try {
+        await desktopBridge.openBooksFolder();
+      } catch (error) {
+        showToast('打开书库失败: ' + error.message, 'error');
+      }
+    });
+  }
 
   // 保留原有的文件输入（用于拖拽上传）
   if (els.fileInput) els.fileInput.addEventListener('change', (e) => uploadBooks(e.target.files));
@@ -347,7 +334,7 @@ function setupEventListeners() {
 }
 
 async function init() {
-  initElectronScrollbarState();
+  initDesktopScrollbarState();
   loadLocalHistory();
   const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'light';
   applyTheme(savedTheme);

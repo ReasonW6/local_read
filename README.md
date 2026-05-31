@@ -6,7 +6,7 @@
 
 语言: [中文](README.md) | [English](README.en.md)
 
-> 一个运行在本地的电子书阅读网页应用，同时提供 Electron 桌面版。通过内置服务器稳定访问你的本地书库，支持手动记录阅读进度。支持 EPUB、TXT、PDF 格式，具备完整的配置管理和数据持久化功能。
+> 一个本地优先的电子书阅读应用，同时提供 Web 浏览器模式和 Tauri 桌面版。Web 端继续使用 Express HTTP API；桌面端使用 Tauri + Rust 本地 command 访问书库、配置、字体和封面数据。支持 EPUB、TXT、PDF 格式，具备完整的配置管理和数据持久化功能。
 
 [⚡快速开始](#-快速开始) | [📝使用说明](#-使用说明) | [🔧配置管理](#-配置管理)
 
@@ -51,7 +51,8 @@
 
 - [Node.js](https://nodejs.org/) v18.0+ (推荐 LTS 版本)
 - 现代浏览器 (Chrome, Firefox, Edge, Safari，仅 Web 模式需要)
-- Electron 桌面版打包依赖已包含在 devDependencies
+- [Rust](https://www.rust-lang.org/tools/install) stable 工具链（Windows 推荐 `stable-msvc`）
+- Windows 桌面开发需要 Microsoft C++ Build Tools 和 WebView2 Runtime
 
 ### ⚡ 安装步骤
 
@@ -74,7 +75,7 @@
     npm install
     ```
     
-    > **注意**: 依赖已在 `package.json` 和 `package-lock.json` 中声明，直接执行 `npm install` 即可安装 Express、Multer、AdmZip、Electron、Vitest 等运行和开发依赖。
+    > **注意**: 依赖已在 `package.json` 和 `package-lock.json` 中声明，直接执行 `npm install` 即可安装 Express、Multer、AdmZip、Tauri CLI、Vitest 等运行和开发依赖。
 
 3. **选择运行方式**
 
@@ -89,28 +90,26 @@
    ```
    **💡 Windows 用户快捷方式：** 双击 `start.bat` 文件，会自动启动服务器并打开浏览器。
 
-   **Electron 桌面模式（开发运行）**
+   **Tauri 桌面模式（开发运行）**
    ```bash
-   npm run electron
+   npm run tauri dev
    ```
-   桌面版内置服务器默认端口为 `31337`，无需单独打开浏览器。
+   Tauri 会加载现有 HTML/CSS/Vanilla JS 前端，但桌面端 API 通过 Rust command 执行，不启动 Electron 或内嵌 Express。
 
-   **Electron 打包**
+   **Tauri 打包**
    ```bash
-   npm run dist
-   # 或仅构建 Windows 安装包/便携包
-   npm run dist:win
+   npm run tauri build
    ```
 
 4. **添加电子书**
 
-   Web 模式：将 `.epub`、`.txt` 或 `.pdf` 文件复制到 `books/` 文件夹中。  
-   Electron 模式：点击应用内“打开书籍文件夹”，或直接放入数据目录中的 `books/`。
+   Web 模式：将 `.epub`、`.txt` 或 `.pdf` 文件复制到项目内 `books/` 文件夹，或使用应用内添加书籍弹窗。<br>
+   Tauri 桌面模式：使用应用内“打开书库”按钮打开桌面端数据目录，或通过添加书籍弹窗导入。
 
 5. **开始阅读**
 
    Web 模式：在浏览器中访问 [http://localhost:3000](http://localhost:3000)。  
-   Electron 版：直接在应用窗口中使用阅读器。
+   Tauri 版：直接在桌面窗口中使用阅读器。
 
 ## 📝 使用说明
 
@@ -175,19 +174,31 @@
 - **自动备份**: 页面关闭时自动保存，防止数据丢失
 - **格式标准**: 使用JSON格式，便于备份和迁移
 
-## 📁 数据目录说明（Electron 打包版）
+## 📁 数据目录说明
 
-Electron 打包版默认将 `books/` 与 `user-data/` 放在系统用户数据目录下（Windows 的 AppData、macOS 的 Library、Linux 的 .config）。  
-可通过环境变量 `LOCAL_READ_DATA_DIR` 指定数据目录；便携版会优先使用 `PORTABLE_EXECUTABLE_DIR`（若存在）。  
-开发模式仍使用项目目录作为数据根目录。
+- Web 模式与 Tauri 开发模式使用项目目录作为数据根目录：
+  - `books/`：电子书文件
+  - `user-data/`：配置文件
+  - `user-data/fonts/`：自定义字体
+- Tauri 打包版默认使用系统 app data 目录作为数据根目录：
+  - Windows：AppData
+  - macOS：Application Support / Library
+  - Linux：`.config`
+- 可通过环境变量 `LOCAL_READ_DATA_DIR` 覆盖 Tauri 桌面端数据根目录，适合便携版或自定义同步目录。
 
 ## 📂 项目结构
 
 ```
 local_read/
-├── books/                                # 📚 存放电子书文件 (.epub, .txt, .pdf)，Electron 打包版位于数据目录
+├── books/                                # 📚 Web/Tauri 开发模式书库 (.epub, .txt, .pdf)
 ├── shared/
-│   └── server-core.js                    # Express API 核心逻辑，供 Web/Electron 复用
+│   └── server-core.js                    # Web 模式 Express API 核心逻辑
+├── src-tauri/                            # 🦀 Tauri 桌面壳与 Rust 本地 API
+│   ├── src/
+│   │   ├── commands.rs                   # 书籍、配置、字体、封面等 Tauri commands
+│   │   ├── paths.rs                      # 数据目录与路径安全逻辑
+│   │   └── models.rs                     # Rust/前端共享数据结构
+│   └── tests/                            # Rust 路径安全测试
 ├── src/                                  # 💻 前端源码
 │   ├── css/                              # 🎨 样式文件
 │   │   ├── base.css                            # 基础样式和CSS变量（包含EPUB图片保护样式）
@@ -200,6 +211,9 @@ local_read/
 │       ├── core/                         # ⚙️ 核心模块
 │       │   ├── config.js                       # 配置常量和DOM引用
 │       │   └── state.js                        # 应用状态管理
+│       ├── platform/
+│       │   ├── apiClient.js                    # Web HTTP / Tauri Rust API 适配层
+│       │   └── desktopBridge.js                # Tauri 窗口与桌面能力桥接
 │       └── modules/                      # 🧩 功能模块
 │           ├── bookmarkManager.js              # 书签管理
 │           ├── bookmarkStorage.js              # 书签存储兼容层
@@ -207,7 +221,7 @@ local_read/
 │           ├── configManager.js                # 配置管理（扩展的排版参数范围）
 │           ├── epubCore.js                     # EPUB核心功能（主题和图片样式处理）
 │           ├── epubReader.js                   # EPUB阅读器
-│           ├── electronScrollbar.js            # Electron 滚动条状态
+│           ├── desktopScrollbar.js             # 桌面端滚动条状态
 │           ├── fileManager.js                  # 文件管理
 │           ├── fontManager.js                  # 自定义字体管理
 │           ├── pdfReader.js                    # PDF阅读器
@@ -218,13 +232,15 @@ local_read/
 ├── tests/                                # 🧪 Vitest 测试
 │   ├── frontend/                         # 前端单元测试
 │   └── server/                           # 服务端单元与 API 测试
-├── user-data/                            # 💾 用户数据目录（Electron 打包版位于数据目录）
+├── user-data/                            # 💾 Web/Tauri 开发模式用户数据目录
 │   └── user-config.json                  # 用户配置文件 (自动生成)
+├── dist-tauri/                           # 📦 Tauri 前端静态资源输出目录（自动生成）
+├── scripts/
+│   ├── build-tauri-assets.js             # Tauri 前端资源复制脚本
+│   └── tauri-dev-server.js               # Tauri 开发模式静态资源服务
 ├── .gitignore                            # 🙈 Git忽略规则
 ├── index.html                            # 📚 书架首页
 ├── reader.html                           # 📖 阅读器页面
-├── electron-main.js                      # ⚙️ Electron 主进程
-├── preload.js                            # 🧩 Electron 预加载脚本
 ├── server.js                             # ⚙️ 后端服务器
 ├── package.json                          # 📄 项目配置文件
 ├── package-lock.json                     # 🔒 依赖版本锁定
@@ -235,7 +251,7 @@ local_read/
 ## 🛠️ 技术栈
 
 - **后端**: Node.js, Express.js
-- **桌面端**: Electron, electron-builder
+- **桌面端**: Tauri 2, Rust
 - **前端**: HTML5, CSS3, Vanilla JavaScript (ES6 Modules)
 - **核心库**: 
   - **ePub.js**: 用于解析和渲染 EPUB 文件
@@ -244,6 +260,7 @@ local_read/
   - **AdmZip**: 用于服务端 EPUB 封面提取
   - **Multer**: 用于书籍和字体上传
 - **测试框架**: Vitest, Supertest
+- **Rust 验证**: cargo test / cargo check
 
 ## 🧪 测试用例
 
@@ -254,6 +271,7 @@ local_read/
 ```
 tests/
 ├── frontend/           # 前端单元测试
+│   ├── apiClient.test.js
 │   ├── addBooksModal.test.js
 │   ├── bookmarkStorage.test.js
 │   ├── configManager.test.js
@@ -261,12 +279,22 @@ tests/
 │   └── utils.test.js       # 工具函数测试
 └── server/             # 服务端测试
     ├── api.test.js         # API 集成测试
+    ├── tauriDev.test.js    # Tauri 开发启动配置测试
     └── utils.test.js       # 服务端工具函数测试
+
+src-tauri/tests/
+└── path_safety.rs      # Rust 数据目录与路径穿越防护测试
 ```
 
 ### 🔍 测试覆盖范围
 
 #### **前端测试** (`tests/frontend/`)
+
+**API 适配层测试** (`apiClient.test.js`)
+- ✅ Web 模式调用 Express HTTP API
+- ✅ Tauri 模式调用 Rust commands
+- ✅ 书籍/字体二进制数据转换为 `ArrayBuffer`
+- ✅ 文件导入时转换为安全的字节数组 payload
 
 **配置模块测试** (`config.test.js`)
 - ✅ `getFileKey` - 文件路径键生成函数
@@ -330,9 +358,6 @@ tests/
 # 运行所有测试
 npm test
 
-# 运行测试并显示覆盖率
-npm run test:coverage
-
 # 监听模式运行测试（开发时使用）
 npm run test:watch
 
@@ -341,17 +366,25 @@ npx vitest tests/frontend
 
 # 仅运行服务端测试
 npx vitest tests/server
+
+# 运行 Rust/Tauri 侧测试
+cargo test --manifest-path src-tauri/Cargo.toml
+
+# 检查 Rust/Tauri 侧编译
+cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
 ### 📊 测试统计
 
-- **总测试用例数**: 106 个
-- **测试文件数**: 7 个
-- **前端测试**: 58 个用例
-- **服务端测试**: 48 个用例
+- **JS 总测试用例数**: 113 个
+- **JS 测试文件数**: 9 个
+- **前端测试**: 63 个用例
+- **服务端测试**: 50 个用例
+- **Rust 测试**: 4 个用例
 - **测试环境**: 
   - 前端测试使用 JSDOM 环境
   - 服务端测试使用 Node 环境
+  - Rust 测试使用 Cargo 测试环境
 
 ## 🤝 贡献
 

@@ -14,5 +14,5 @@
 ## 图标生成工具
 
 你可以使用以下工具生成多平台图标：
-- https://www.electron.build/icons
+- https://v2.tauri.app/develop/icons/
 - https://iconverticons.com/online/

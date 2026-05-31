@@ -2,6 +2,7 @@
 import { state, updateState } from '../core/state.js';
 import { DOM, CONFIG, getFileKey } from '../core/config.js';
 import { formatTimeAgo } from '../core/utils.js';
+import { apiClient } from '../platform/apiClient.js';
 
 // Load reading history from localStorage
 export function loadReadingHistory() {
@@ -53,9 +54,7 @@ export function updateReadingHistory(book) {
 // Load bookshelf from server
 export async function loadBookshelf() {
   try {
-    const response = await fetch(CONFIG.SERVER_API.BOOKSHELF);
-    if (!response.ok) throw new Error('Failed to fetch bookshelf');
-    const books = await response.json();
+    const books = await apiClient.listBooks();
     updateState({ bookshelf: books });
 
     // 加载阅读历史
@@ -176,9 +175,7 @@ export function renderBookshelf() {
 // Load book from server
 export async function openBookFromServer(book) {
   try {
-    const response = await fetch(`${CONFIG.SERVER_API.BOOK}?path=${encodeURIComponent(book.path)}`);
-    if (!response.ok) throw new Error(`Book not found or failed to load: ${book.name}`);
-    const fileData = await response.arrayBuffer();
+    const fileData = await apiClient.readBook(book.path);
     updateState({ currentFileKey: getFileKey(book.path) });
 
     // 更新阅读历史

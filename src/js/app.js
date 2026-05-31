@@ -33,7 +33,8 @@ import {
   renderFontSelector,
   initFontUpload
 } from './modules/fontManager.js';
-import { initElectronScrollbarState } from './modules/electronScrollbar.js';
+import { initDesktopScrollbarState } from './modules/desktopScrollbar.js';
+import { apiClient } from './platform/apiClient.js';
 
 // 导入新模块
 import { 
@@ -192,15 +193,7 @@ async function saveAllData() {
     persistCurrentReadingSession();
     
     const config = configManager.collectAllData();
-    const response = await fetch('/api/save-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ config, filename: 'user-config.json' })
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to save config to server');
-    }
+    await apiClient.saveConfig(config, 'user-config.json');
     
     showSavedIndicator();
     configManager.showMessage('所有数据已保存！', 'success');
@@ -215,42 +208,38 @@ async function saveAllData() {
 // 预加载全局设置
 async function preloadGlobalSettings() {
   try {
-    const response = await fetch('/api/load-config/user-config.json');
-    
-    if (response.ok) {
-      const result = await response.json();
-      const config = result.config;
-      cachedUserConfig = config;
-      
-      if (config.settings && config.settings.fontSize) {
-        state.fontSize = config.settings.fontSize;
-        document.documentElement.style.setProperty('--font-size', config.settings.fontSize + 'px');
-        const reader = DOM.reader();
-        if (reader) {
-          reader.style.fontSize = config.settings.fontSize + 'px';
-        }
-      }
-      
-      const overrideTheme = localStorage.getItem(THEME_STORAGE_KEY);
-      const normalizedOverride = (overrideTheme === CONFIG.THEMES.DARK || overrideTheme === CONFIG.THEMES.LIGHT) ? overrideTheme : null;
+    const result = await apiClient.loadConfig('user-config.json');
+    const config = result.config;
+    cachedUserConfig = config;
 
-      if (normalizedOverride) {
-        state.theme = normalizedOverride;
-        document.body.setAttribute('data-theme', normalizedOverride);
-      } else if (config.settings && config.settings.theme) {
-        state.theme = config.settings.theme;
-        document.body.setAttribute('data-theme', config.settings.theme);
+    if (config.settings && config.settings.fontSize) {
+      state.fontSize = config.settings.fontSize;
+      document.documentElement.style.setProperty('--font-size', config.settings.fontSize + 'px');
+      const reader = DOM.reader();
+      if (reader) {
+        reader.style.fontSize = config.settings.fontSize + 'px';
       }
-      
-      if (config.readingPrefs) {
-        const normalizedPrefs = saveReadingPrefs(config.readingPrefs);
-        applyTypography(normalizedPrefs, updateReadingProgress);
-        applyProgressBarPreference(normalizedPrefs.progressBarEnabled !== false);
-        updateSettingsPanelUI(normalizedPrefs);
-      }
-      
-      console.log('全局设置已预加载');
     }
+
+    const overrideTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    const normalizedOverride = (overrideTheme === CONFIG.THEMES.DARK || overrideTheme === CONFIG.THEMES.LIGHT) ? overrideTheme : null;
+
+    if (normalizedOverride) {
+      state.theme = normalizedOverride;
+      document.body.setAttribute('data-theme', normalizedOverride);
+    } else if (config.settings && config.settings.theme) {
+      state.theme = config.settings.theme;
+      document.body.setAttribute('data-theme', config.settings.theme);
+    }
+
+    if (config.readingPrefs) {
+      const normalizedPrefs = saveReadingPrefs(config.readingPrefs);
+      applyTypography(normalizedPrefs, updateReadingProgress);
+      applyProgressBarPreference(normalizedPrefs.progressBarEnabled !== false);
+      updateSettingsPanelUI(normalizedPrefs);
+    }
+
+    console.log('全局设置已预加载');
   } catch (error) {
     console.log('没有找到用户配置文件，使用默认设置');
   }
@@ -261,12 +250,9 @@ async function autoLoadUserConfig() {
   try {
     let config = cachedUserConfig;
     if (!config) {
-      const response = await fetch('/api/load-config/user-config.json');
-      if (response.ok) {
-        const result = await response.json();
-        config = result.config;
-        cachedUserConfig = config;
-      }
+      const result = await apiClient.loadConfig('user-config.json');
+      config = result.config;
+      cachedUserConfig = config;
     }
     
     if (config) {
@@ -779,24 +765,10 @@ function initSidebarAutoClose() {
 async function uploadFiles(files) {
   if (files.length === 0) return;
   
-  const formData = new FormData();
-  files.forEach(file => {
-    formData.append('books', file);
-  });
-  
   try {
     showUploadProgress(`正在上传 ${files.length} 个文件...`);
-    
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData
-    });
-    
-    if (!response.ok) {
-      throw new Error(`上传失败: ${response.status}`);
-    }
-    
-    const result = await response.json();
+
+    const result = await apiClient.uploadBooks(files);
     showUploadProgress(result.message, 'success');
     
     setTimeout(() => {
@@ -869,7 +841,7 @@ function hideUploadProgress() {
 /* ========== 事件监听器设置 ========== */
 
 function setupEventListeners() {
-  initElectronScrollbarState();
+  initDesktopScrollbarState();
 
   document.addEventListener('DOMContentLoaded', async () => {
     await preloadGlobalSettings();
@@ -966,18 +938,25 @@ function setupEventListeners() {
       
       updateState({ currentlyReading: null });
       
-      // BUG-1: 检查 sendBeacon 返回值，失败时使用同步 XHR 作为后备
+      // Web 模式保留 sendBeacon；Tauri 模式改走本地 command。
       try {
         const config = configManager.collectAllData();
         const jsonStr = JSON.stringify({ config, filename: 'user-config.json' });
-        const blob = new Blob([jsonStr], { type: 'application/json' });
-        const sent = navigator.sendBeacon('/api/save-config', blob);
-        if (!sent) {
-          // sendBeacon 失败（如数据量过大），使用同步 XHR 后备
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', '/api/save-config', false);
-          xhr.setRequestHeader('Content-Type', 'application/json');
-          xhr.send(jsonStr);
+        if (apiClient.mode === 'http') {
+          const blob = new Blob([jsonStr], { type: 'application/json' });
+          const sent = navigator.sendBeacon('/api/save-config', blob);
+          if (!sent) {
+            // sendBeacon 失败（如数据量过大），使用同步 XHR 后备
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/save-config', false);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.send(jsonStr);
+          }
+        } else {
+          // Tauri 关闭前不能使用同步 XHR，尽量触发一次本地保存。
+          apiClient.saveConfig(config, 'user-config.json').catch((error) => {
+            console.warn('自动保存失败:', error);
+          });
         }
       } catch (e) {
         console.warn('自动保存失败:', e);

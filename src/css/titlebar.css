@@ -1,4 +1,4 @@
-/* 自定义标题栏样式 - 仅在 Electron 环境下生效 */
+/* 自定义标题栏样式 - 仅在 桌面端环境下生效 */
 
 .titlebar {
   position: fixed;
@@ -123,25 +123,25 @@ body.dark-mode .titlebar-btn:active,
   color: #fff;
 }
 
-/* Electron 环境下推低页面内容 */
-html.electron-app,
-body.electron-app {
-  --electron-scrollbar-size: 9px;
-  --electron-scrollbar-thumb: rgba(38, 38, 38, 0.08);
-  --electron-scrollbar-thumb-hover: rgba(38, 38, 38, 0.14);
-  --electron-scrollbar-thumb-active: rgba(38, 38, 38, 0.2);
-  --electron-scrollbar-track: transparent;
+/* 桌面端环境下推低页面内容 */
+html.desktop-app,
+body.desktop-app {
+  --desktop-scrollbar-size: 9px;
+  --desktop-scrollbar-thumb: rgba(38, 38, 38, 0.08);
+  --desktop-scrollbar-thumb-hover: rgba(38, 38, 38, 0.14);
+  --desktop-scrollbar-thumb-active: rgba(38, 38, 38, 0.2);
+  --desktop-scrollbar-track: transparent;
 }
 
-body.electron-app {
+body.desktop-app {
   padding-top: 36px;
 }
 
-html.electron-app.bookshelf-page {
+html.desktop-app.bookshelf-page {
   overflow: hidden;
 }
 
-body.electron-app.bookshelf-page {
+body.desktop-app.bookshelf-page {
   height: calc(100vh - 36px);
   margin-top: 36px;
   padding-top: 0;
@@ -149,125 +149,125 @@ body.electron-app.bookshelf-page {
   overflow-x: hidden;
 }
 
-html.electron-app,
-body.electron-app,
-html.electron-app *,
-body.electron-app * {
+html.desktop-app,
+body.desktop-app,
+html.desktop-app *,
+body.desktop-app * {
   scrollbar-width: thin;
-  scrollbar-color: var(--electron-scrollbar-thumb) var(--electron-scrollbar-track);
+  scrollbar-color: var(--desktop-scrollbar-thumb) var(--desktop-scrollbar-track);
 }
 
-html.electron-app::-webkit-scrollbar,
-body.electron-app::-webkit-scrollbar,
-html.electron-app *::-webkit-scrollbar,
-body.electron-app *::-webkit-scrollbar {
-  width: var(--electron-scrollbar-size);
-  height: var(--electron-scrollbar-size);
+html.desktop-app::-webkit-scrollbar,
+body.desktop-app::-webkit-scrollbar,
+html.desktop-app *::-webkit-scrollbar,
+body.desktop-app *::-webkit-scrollbar {
+  width: var(--desktop-scrollbar-size);
+  height: var(--desktop-scrollbar-size);
 }
 
-html.electron-app::-webkit-scrollbar-track,
-body.electron-app::-webkit-scrollbar-track,
-html.electron-app *::-webkit-scrollbar-track,
-body.electron-app *::-webkit-scrollbar-track {
-  background: var(--electron-scrollbar-track);
+html.desktop-app::-webkit-scrollbar-track,
+body.desktop-app::-webkit-scrollbar-track,
+html.desktop-app *::-webkit-scrollbar-track,
+body.desktop-app *::-webkit-scrollbar-track {
+  background: var(--desktop-scrollbar-track);
 }
 
-html.electron-app::-webkit-scrollbar-thumb,
-body.electron-app::-webkit-scrollbar-thumb,
-html.electron-app *::-webkit-scrollbar-thumb,
-body.electron-app *::-webkit-scrollbar-thumb {
+html.desktop-app::-webkit-scrollbar-thumb,
+body.desktop-app::-webkit-scrollbar-thumb,
+html.desktop-app *::-webkit-scrollbar-thumb,
+body.desktop-app *::-webkit-scrollbar-thumb {
   min-height: 52px;
   border: 2.5px solid transparent;
   border-radius: 999px;
-  background: var(--electron-scrollbar-thumb);
+  background: var(--desktop-scrollbar-thumb);
   background-clip: padding-box;
   box-shadow: none;
   transition: background-color 0.2s ease;
 }
 
-html.electron-app::-webkit-scrollbar-thumb:hover,
-body.electron-app::-webkit-scrollbar-thumb:hover,
-html.electron-app *::-webkit-scrollbar-thumb:hover,
-body.electron-app *::-webkit-scrollbar-thumb:hover {
-  background: var(--electron-scrollbar-thumb-hover);
+html.desktop-app::-webkit-scrollbar-thumb:hover,
+body.desktop-app::-webkit-scrollbar-thumb:hover,
+html.desktop-app *::-webkit-scrollbar-thumb:hover,
+body.desktop-app *::-webkit-scrollbar-thumb:hover {
+  background: var(--desktop-scrollbar-thumb-hover);
   background-clip: padding-box;
 }
 
-html.electron-scroll-active::-webkit-scrollbar-thumb,
-body.electron-scroll-active::-webkit-scrollbar-thumb,
-html.electron-scroll-active *::-webkit-scrollbar-thumb,
-body.electron-scroll-active *::-webkit-scrollbar-thumb {
-  background: var(--electron-scrollbar-thumb-active);
+html.desktop-scroll-active::-webkit-scrollbar-thumb,
+body.desktop-scroll-active::-webkit-scrollbar-thumb,
+html.desktop-scroll-active *::-webkit-scrollbar-thumb,
+body.desktop-scroll-active *::-webkit-scrollbar-thumb {
+  background: var(--desktop-scrollbar-thumb-active);
   background-clip: padding-box;
 }
 
-html.electron-app::-webkit-scrollbar-button,
-body.electron-app::-webkit-scrollbar-button,
-html.electron-app *::-webkit-scrollbar-button,
-body.electron-app *::-webkit-scrollbar-button {
+html.desktop-app::-webkit-scrollbar-button,
+body.desktop-app::-webkit-scrollbar-button,
+html.desktop-app *::-webkit-scrollbar-button,
+body.desktop-app *::-webkit-scrollbar-button {
   display: none;
 }
 
-html.electron-app::-webkit-scrollbar-corner,
-body.electron-app::-webkit-scrollbar-corner,
-html.electron-app *::-webkit-scrollbar-corner,
-body.electron-app *::-webkit-scrollbar-corner {
+html.desktop-app::-webkit-scrollbar-corner,
+body.desktop-app::-webkit-scrollbar-corner,
+html.desktop-app *::-webkit-scrollbar-corner,
+body.desktop-app *::-webkit-scrollbar-corner {
   background: transparent;
 }
 
-body.electron-app .main,
-body.electron-app .bookshelf,
-body.electron-app .chapter-list-container,
-body.electron-app .settings-content,
-body.electron-app .add-books-body,
-body.electron-app .files-list {
+body.desktop-app .main,
+body.desktop-app .bookshelf,
+body.desktop-app .chapter-list-container,
+body.desktop-app .settings-content,
+body.desktop-app .add-books-body,
+body.desktop-app .files-list {
   scrollbar-gutter: stable;
 }
 
-html.electron-app.bookshelf-page,
-body.electron-app.bookshelf-page {
-  --electron-scrollbar-thumb: rgba(38, 38, 38, 0.08);
-  --electron-scrollbar-thumb-hover: rgba(38, 38, 38, 0.14);
-  --electron-scrollbar-thumb-active: rgba(38, 38, 38, 0.2);
+html.desktop-app.bookshelf-page,
+body.desktop-app.bookshelf-page {
+  --desktop-scrollbar-thumb: rgba(38, 38, 38, 0.08);
+  --desktop-scrollbar-thumb-hover: rgba(38, 38, 38, 0.14);
+  --desktop-scrollbar-thumb-active: rgba(38, 38, 38, 0.2);
 }
 
-html.electron-app.reader-page,
-body.electron-app.reader-page {
-  --electron-scrollbar-thumb: rgba(61, 61, 61, 0.09);
-  --electron-scrollbar-thumb-hover: rgba(61, 61, 61, 0.15);
-  --electron-scrollbar-thumb-active: rgba(61, 61, 61, 0.22);
+html.desktop-app.reader-page,
+body.desktop-app.reader-page {
+  --desktop-scrollbar-thumb: rgba(61, 61, 61, 0.09);
+  --desktop-scrollbar-thumb-hover: rgba(61, 61, 61, 0.15);
+  --desktop-scrollbar-thumb-active: rgba(61, 61, 61, 0.22);
 }
 
-html.electron-app.bookshelf-page.dark-mode,
-body.electron-app.bookshelf-page.dark-mode,
-body.dark-mode.electron-app.bookshelf-page {
-  --electron-scrollbar-thumb: rgba(255, 255, 255, 0.12);
-  --electron-scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
-  --electron-scrollbar-thumb-active: rgba(255, 255, 255, 0.26);
+html.desktop-app.bookshelf-page.dark-mode,
+body.desktop-app.bookshelf-page.dark-mode,
+body.dark-mode.desktop-app.bookshelf-page {
+  --desktop-scrollbar-thumb: rgba(255, 255, 255, 0.12);
+  --desktop-scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
+  --desktop-scrollbar-thumb-active: rgba(255, 255, 255, 0.26);
 }
 
-html[data-theme="dark"].electron-app.reader-page,
-body[data-theme="dark"].electron-app.reader-page,
-[data-theme="dark"] body.electron-app.reader-page {
-  --electron-scrollbar-thumb: rgba(255, 255, 255, 0.13);
-  --electron-scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
-  --electron-scrollbar-thumb-active: rgba(255, 255, 255, 0.28);
+html[data-theme="dark"].desktop-app.reader-page,
+body[data-theme="dark"].desktop-app.reader-page,
+[data-theme="dark"] body.desktop-app.reader-page {
+  --desktop-scrollbar-thumb: rgba(255, 255, 255, 0.13);
+  --desktop-scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
+  --desktop-scrollbar-thumb-active: rgba(255, 255, 255, 0.28);
 }
 
 /* 书架页：sticky header 需要 top: 36px */
-body.electron-app.bookshelf-page .qd-header {
+body.desktop-app.bookshelf-page .qd-header {
   top: 0;
 }
 
 /* 阅读器页：进度条和容器调整 */
-body.electron-app .reading-progress {
+body.desktop-app .reading-progress {
   top: 36px;
 }
 
-body.electron-app .reading-progress__text {
+body.desktop-app .reading-progress__text {
   top: 42px;
 }
 
-body.electron-app .container {
+body.desktop-app .container {
   height: calc(100vh - 36px);
 }

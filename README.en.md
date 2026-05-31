@@ -6,7 +6,7 @@
 
 Language: [中文](README.md) | [English](README.en.md)
 
-> A local-first e-book reader available as both a browser app and an Electron desktop app. It runs an embedded local server for stable access to your personal library, supports EPUB, TXT, and PDF files, and includes reading progress, bookmarks, preferences, custom fonts, and config backup/restore.
+> A local-first e-book reader available as both a browser app and a Tauri desktop app. Web mode keeps the Express HTTP API; desktop mode uses Tauri + Rust commands for books, configs, fonts, covers, and local data access. It supports EPUB, TXT, and PDF files, with reading progress, bookmarks, preferences, custom fonts, and config backup/restore.
 
 [Quick Start](#quick-start) | [Usage](#usage) | [Configuration](#configuration) | [Project Structure](#project-structure)
 
@@ -50,7 +50,8 @@ Language: [中文](README.md) | [English](README.en.md)
 
 - [Node.js](https://nodejs.org/) v18.0 or newer
 - A modern browser for Web mode
-- Electron build dependencies are included in `devDependencies`
+- [Rust](https://www.rust-lang.org/tools/install) stable toolchain for Tauri desktop mode
+- Windows desktop builds require Microsoft C++ Build Tools and WebView2 Runtime
 
 ### Install
 
@@ -60,7 +61,7 @@ cd local_read
 npm install
 ```
 
-Dependencies are declared in `package.json` and `package-lock.json`, so `npm install` is enough for Express, Multer, AdmZip, Electron, Vitest, and related packages.
+Dependencies are declared in `package.json` and `package-lock.json`, so `npm install` is enough for Express, Multer, AdmZip, Tauri CLI, Vitest, and related JavaScript packages.
 
 ### Run In Web Mode
 
@@ -76,24 +77,27 @@ node server.js
 
 When the server starts, open [http://localhost:3000](http://localhost:3000). On Windows, you can also double-click `start.bat`.
 
-### Run In Electron Mode
+### Run In Tauri Desktop Mode
+
+Development run:
 
 ```bash
-npm run electron
+npm run tauri dev
 ```
 
-The desktop app starts an embedded local server on port `31337`, so you do not need to open a separate browser window.
+Tauri loads the existing HTML/CSS/vanilla JavaScript frontend. Desktop data access goes through Rust commands and does not start Electron or an embedded Express server.
 
 ### Build Desktop Packages
 
 ```bash
-npm run dist
+npm run tauri build
 ```
 
-Windows-only build:
+You can also use the explicit script aliases:
 
 ```bash
-npm run dist:win
+npm run tauri:dev
+npm run tauri:build
 ```
 
 ## Usage
@@ -101,7 +105,7 @@ npm run dist:win
 ### Add Books
 
 - Web mode: copy `.epub`, `.txt`, or `.pdf` files into the `books/` folder, or use the in-app add-books dialog.
-- Electron mode: use the in-app "open books folder" action, or place files in the app data directory's `books/` folder.
+- Tauri desktop mode: use the in-app "open books folder" action, or import files through the add-books dialog.
 
 ### Reading Controls
 
@@ -125,7 +129,11 @@ npm run dist:win
 
 ## Configuration
 
-The app stores user data in `user-data/user-config.json` in Web/development mode.
+Web mode and Tauri development mode use the project directory as the data root:
+
+- `books/`: book files
+- `user-data/`: config files
+- `user-data/fonts/`: custom fonts
 
 Saved data includes:
 
@@ -136,13 +144,13 @@ Saved data includes:
 - Last-read book
 - Reading history
 
-Electron packaged builds store `books/` and `user-data/` under the platform user data directory by default:
+Tauri packaged builds store `books/`, `user-data/`, and `user-data/fonts/` under the platform app data directory by default:
 
 - Windows: AppData
-- macOS: Library application data
+- macOS: Application Support / Library
 - Linux: `.config`
 
-You can override the data root with `LOCAL_READ_DATA_DIR`. Portable builds also respect `PORTABLE_EXECUTABLE_DIR` when available.
+You can override the Tauri desktop data root with `LOCAL_READ_DATA_DIR`, which is useful for portable builds or a custom synced folder.
 
 ## Project Structure
 
@@ -150,7 +158,13 @@ You can override the data root with `LOCAL_READ_DATA_DIR`. Portable builds also 
 local_read/
 ├── books/                       # Local book library in Web/dev mode
 ├── shared/
-│   └── server-core.js           # Shared Express API core for Web and Electron
+│   └── server-core.js           # Express API core for Web mode
+├── src-tauri/                   # Tauri desktop shell and Rust local API
+│   ├── src/
+│   │   ├── commands.rs          # Book, config, font, cover, and folder commands
+│   │   ├── paths.rs             # Data directory and path safety logic
+│   │   └── models.rs            # Shared Rust/frontend data models
+│   └── tests/                   # Rust path safety tests
 ├── src/
 │   ├── css/                     # Styles
 │   │   ├── base.css
@@ -162,13 +176,16 @@ local_read/
 │       ├── app.js               # Reader app entry
 │       ├── bookshelfApp.js      # Bookshelf page entry
 │       ├── core/                # Shared frontend config, state, and utilities
+│       ├── platform/            # Web HTTP / Tauri Rust API adapters
 │       └── modules/             # Reader, bookmarks, config, fonts, PDF/TXT/EPUB modules
 ├── tests/
 │   ├── frontend/                # JSDOM unit tests
 │   └── server/                  # Node API and utility tests
 ├── user-data/                   # Config data in Web/dev mode
-├── electron-main.js             # Electron main process
-├── preload.js                   # Electron preload bridge
+├── dist-tauri/                  # Generated Tauri frontend assets
+├── scripts/
+│   ├── build-tauri-assets.js    # Copies static frontend assets for Tauri
+│   └── tauri-dev-server.js      # Static frontend server for Tauri dev mode
 ├── server.js                    # Web-mode server entry
 ├── index.html                   # Bookshelf page
 ├── reader.html                  # Reader page
@@ -179,11 +196,11 @@ local_read/
 ## Tech Stack
 
 - Backend: Node.js, Express
-- Desktop: Electron, electron-builder
+- Desktop: Tauri 2, Rust
 - Frontend: HTML, CSS, vanilla JavaScript ES modules
 - Reading libraries: ePub.js, PDF.js, JSZip
 - Server utilities: Multer, AdmZip
-- Tests: Vitest, Supertest, JSDOM
+- Tests: Vitest, Supertest, JSDOM, Cargo
 
 ## Tests
 
@@ -211,10 +228,18 @@ Run only server tests:
 npx vitest tests/server
 ```
 
-Current test coverage includes 7 test files and 106 test cases:
+Run Rust/Tauri-side tests and checks:
 
-- Frontend: config, utility helpers, bookmark storage, config manager behavior, and add-books modal rendering
-- Server: API integration tests and path/file utility tests, including traversal protection
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo check --manifest-path src-tauri/Cargo.toml
+```
+
+Current JavaScript coverage includes 9 test files and 113 test cases:
+
+- Frontend: API adapter, config, utility helpers, bookmark storage, config manager behavior, and add-books modal rendering
+- Server: API integration tests, Tauri dev startup config, and path/file utility tests, including traversal protection
+- Rust: 4 path safety tests for desktop data directories
 
 ## Contributing
 

@@ -10,4 +10,7 @@ user-data/*
 .cache/
 .codebuddy/
 dist/
+dist-tauri/*
+!dist-tauri/.gitkeep
+src-tauri/target/
 更新日志.txt

@@ -1,16 +1,18 @@
-export function initElectronScrollbarState() {
-  if (!(window.electronAPI && window.electronAPI.isElectron)) return;
+import { desktopBridge } from '../platform/desktopBridge.js';
+
+export function initDesktopScrollbarState() {
+  if (!desktopBridge.isDesktop) return;
 
   const roots = [document.documentElement, document.body];
   let hideTimer = null;
 
   const setActive = () => {
-    roots.forEach(node => node.classList.add('electron-scroll-active'));
+    roots.forEach(node => node.classList.add('desktop-scroll-active'));
     if (hideTimer) {
       clearTimeout(hideTimer);
     }
     hideTimer = setTimeout(() => {
-      roots.forEach(node => node.classList.remove('electron-scroll-active'));
+      roots.forEach(node => node.classList.remove('desktop-scroll-active'));
     }, 1000);
   };
 

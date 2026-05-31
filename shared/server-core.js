@@ -1,5 +1,5 @@
 // shared/server-core.js - 共享的 Express 服务核心逻辑
-// 由 server.js（浏览器模式）和 electron-main.js（Electron 模式）共同复用
+// 由 server.js 提供 Web 模式 HTTP API；Tauri 桌面端使用 Rust command。
 
 const express = require('express');
 const multer = require('multer');

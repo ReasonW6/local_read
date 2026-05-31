@@ -1,0 +1,27 @@
+[package]
+name = "local-read"
+version = "1.0.0"
+description = "Local E-Book Reader Tauri shell"
+edition = "2021"
+
+[lib]
+name = "local_read_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "local-read"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+time = { version = "0.3", features = ["formatting"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,5 +1,6 @@
 // 字体管理模块
 import { state } from '../core/state.js';
+import { apiClient } from '../platform/apiClient.js';
 
 // 预设字体列表
 export const PRESET_FONTS = [
@@ -44,10 +45,7 @@ export function saveFontSettings(settings) {
  */
 export async function getCustomFonts() {
   try {
-    const response = await fetch('/api/fonts');
-    if (response.ok) {
-      return await response.json();
-    }
+    return await apiClient.listFonts();
   } catch (e) {
     console.warn('获取自定义字体列表失败:', e);
   }
@@ -58,41 +56,21 @@ export async function getCustomFonts() {
  * 上传自定义字体
  */
 export async function uploadFont(file) {
-  const formData = new FormData();
-  formData.append('font', file);
-  
-  const response = await fetch('/api/fonts/upload', {
-    method: 'POST',
-    body: formData
-  });
-  
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: '上传失败' }));
-    throw new Error(error.error || '上传失败');
-  }
-  
-  return await response.json();
+  return await apiClient.uploadFont(file);
 }
 
 /**
  * 删除自定义字体
  */
 export async function deleteFont(fontId) {
-  const response = await fetch(`/api/fonts/${encodeURIComponent(fontId)}`, {
-    method: 'DELETE'
-  });
-  
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: '删除失败' }));
-    throw new Error(error.error || '删除失败');
-  }
+  const result = await apiClient.deleteFont(fontId);
   
   // 移除已加载的字体
   if (loadedCustomFonts.has(fontId)) {
     loadedCustomFonts.delete(fontId);
   }
   
-  return await response.json();
+  return result;
 }
 
 /**
@@ -104,7 +82,8 @@ export async function loadCustomFont(font) {
   }
   
   try {
-    const fontFace = new FontFace(font.fontFamily, `url(/api/fonts/file/${encodeURIComponent(font.id)})`);
+    const fontUrl = await apiClient.getFontUrl(font.id);
+    const fontFace = new FontFace(font.fontFamily, `url(${fontUrl})`);
     await fontFace.load();
     document.fonts.add(fontFace);
     loadedCustomFonts.set(font.id, fontFace);

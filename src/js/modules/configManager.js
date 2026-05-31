@@ -14,6 +14,7 @@ import {
   persistBookmarkMap
 } from './bookmarkStorage.js';
 import { renderBookmarkList } from './bookmarkManager.js';
+import { apiClient } from '../platform/apiClient.js';
 
 // 配置管理器
 export class ConfigManager {
@@ -113,22 +114,7 @@ export class ConfigManager {
     try {
       const config = this.collectAllData();
 
-      const response = await fetch('/api/save-config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          config: config,
-          filename: customName
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save config');
-      }
-
-      const result = await response.json();
+      const result = await apiClient.saveConfig(config, customName);
       this.currentConfigName = result.filename;
 
       // 显示成功消息
@@ -145,13 +131,7 @@ export class ConfigManager {
   // 从服务器加载配置
   async loadConfig(filename) {
     try {
-      const response = await fetch(`/api/load-config/${filename}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to load config');
-      }
-
-      const result = await response.json();
+      const result = await apiClient.loadConfig(filename);
       await this.applyConfig(result.config);
 
       this.currentConfigName = filename;
@@ -336,14 +316,7 @@ export class ConfigManager {
   // 获取配置文件列表
   async getConfigList() {
     try {
-      const response = await fetch('/api/config-list');
-
-      if (!response.ok) {
-        throw new Error('Failed to get config list');
-      }
-
-      const result = await response.json();
-      return result.configs;
+      return await apiClient.listConfigs();
     } catch (error) {
       console.error('Error getting config list:', error);
       throw error;
@@ -353,15 +326,7 @@ export class ConfigManager {
   // 删除配置文件
   async deleteConfig(filename) {
     try {
-      const response = await fetch(`/api/config/${filename}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete config');
-      }
-
-      const result = await response.json();
+      const result = await apiClient.deleteConfig(filename);
       this.showMessage('配置文件删除成功！', 'success');
       return result;
     } catch (error) {
@@ -373,13 +338,7 @@ export class ConfigManager {
 
   // 下载配置文件
   downloadConfig(filename) {
-    const link = document.createElement('a');
-    // BUG-10: 编码文件名防止特殊字符破坏 URL
-    link.href = `/api/download-config/${encodeURIComponent(filename)}`;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    apiClient.downloadConfig(filename);
   }
 
   // 显示消息
